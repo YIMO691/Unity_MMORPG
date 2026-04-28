@@ -4,6 +4,7 @@
 
 ### Phase 1
 
+- Added a Qwen context check script and verified Task 5 scope understanding before city design generation.
 - Added Qwen project context and task rules to reduce scope drift before Phase 1 Task 5.
 - Phase 1 Task 4: fixed role selection design by aligning `role.proto` with the shared proto namespace, using `POST /api/roles/list`, removing out-of-scope city/WebSocket steps, and repairing Markdown/changelog text.
 - Phase 1 Task 4: completed role selection flow design, including `role.proto`, role interface documentation, and role selection sequence notes, without implementing role business logic.
