@@ -105,6 +105,16 @@ POST /api/roles/select
 
 **Note**: The current server only implements `/health`. Login and role selection interfaces are design-only and have no server business implementation yet.
 
+## Planned City Interface
+
+The city entry endpoint is designed for Phase 1 Task 5. It is not implemented in the current Gateway skeleton.
+
+```text
+POST /api/scene/enter-city
+```
+
+**Note**: The current server only implements `/health`. The city interface is design-only and has no server business implementation yet.
+
 ## Not Implemented Yet
 
 - Login business logic.
@@ -121,4 +131,4 @@ POST /api/roles/select
 
 ## Next Step
 
-Phase 1 Task 5: empty city screen design.
+Phase 1 implementation planning: choose the next scoped implementation task after reviewing the completed Phase 1 design documents.

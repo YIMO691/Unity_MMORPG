@@ -6,6 +6,28 @@ option csharp_namespace = "AIMMO.Proto";
 
 import "common.proto";
 
+message CityRoleInfo {
+  string role_id = 1;
+  string name = 2;
+  int32 level = 3;
+  int32 class_id = 4;
+  int32 scene_id = 5;
+  int64 gold = 6;
+}
+
+message C2S_EnterCityReq {
+  string player_id = 1;
+  string token = 2;
+  string role_id = 3;
+}
+
+message S2C_EnterCityRes {
+  int32 code = 1;
+  string message = 2;
+  CityRoleInfo role = 3;
+  int64 server_time = 4;
+}
+
 message C2S_EnterSceneReq {
   int32 scene_id = 1;
 }
@@ -16,4 +38,3 @@ message S2C_EnterSceneRes {
   Vector3 spawn_position = 3;
   repeated EntitySnapshot entities = 4;
 }
-

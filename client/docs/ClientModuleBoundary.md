@@ -59,6 +59,15 @@ Network must not mutate authoritative gameplay state without server response.
 - Do not handle city business logic.
 - Communicate with server through NetworkClient.
 
+## City Module Responsibilities
+
+- Receive selectedRole from RoleSelect module.
+- Request empty city screen data from the server via HTTP API.
+- Display role name, level, and gold from server response.
+- Do not directly decide server state.
+- Do not handle entity sync, movement sync, combat, NPC, quest, or chat logic.
+- Communicate with server through NetworkClient.
+
 ## Feature Communication
 
 - Feature modules communicate through controller APIs and shared events.
