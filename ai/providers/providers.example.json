@@ -1,0 +1,72 @@
+{
+  "providers": {
+    "openai": {
+      "enabled": true,
+      "api_key_env": "OPENAI_API_KEY",
+      "base_url_env": "OPENAI_BASE_URL",
+      "default_base_url": "https://api.openai.com/v1",
+      "default_model_env": "OPENAI_MODEL",
+      "recommended_for": [
+        "codex_main_execution",
+        "fallback",
+        "complex_code_generation"
+      ]
+    },
+    "qwen": {
+      "enabled": true,
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "base_url_env": "QWEN_BASE_URL",
+      "default_base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "default_model_env": "QWEN_CODER_MODEL",
+      "default_model": "qwen3-coder-plus",
+      "recommended_for": [
+        "unity_csharp",
+        "dotnet_server",
+        "protobuf",
+        "lua",
+        "docker",
+        "ci"
+      ]
+    },
+    "kimi": {
+      "enabled": true,
+      "api_key_env": "MOONSHOT_API_KEY",
+      "base_url_env": "KIMI_BASE_URL",
+      "default_base_url": "https://api.moonshot.ai/v1",
+      "default_model_env": "KIMI_MODEL",
+      "default_model": "kimi-k2.5",
+      "recommended_for": [
+        "long_context",
+        "documentation",
+        "code_review",
+        "architecture_review"
+      ]
+    },
+    "deepseek": {
+      "enabled": true,
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "base_url_env": "DEEPSEEK_BASE_URL",
+      "default_base_url": "https://api.deepseek.com",
+      "default_model_env": "DEEPSEEK_MODEL",
+      "default_model": "deepseek-v4-pro",
+      "recommended_for": [
+        "bug_analysis",
+        "reasoning",
+        "server_logic",
+        "combat_logic"
+      ]
+    },
+    "mimo": {
+      "enabled": false,
+      "api_key_env": "XIAOMI_API_KEY",
+      "base_url_env": "MIMO_BASE_URL",
+      "default_base_url": "https://api.xiaomimimo.com/v1",
+      "default_model_env": "MIMO_MODEL",
+      "recommended_for": [
+        "long_context",
+        "task_planning",
+        "architecture_consistency_check"
+      ]
+    }
+  }
+}

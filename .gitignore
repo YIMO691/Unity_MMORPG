@@ -1,0 +1,9 @@
+.env
+.env.local
+*.local.json
+.venv/
+.tools/
+__pycache__/
+*.pyc
+ai/outputs/*
+!ai/outputs/.gitkeep
