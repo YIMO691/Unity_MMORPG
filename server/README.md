@@ -93,6 +93,18 @@ Response example:
 
 **Note**: The current server only implements `/health`. The guest login interface is design-only in Phase 1 Task 3 and has no server business implementation yet.
 
+## Planned Role Selection Interface
+
+The role selection endpoints are designed for Phase 1 Task 4. They are not implemented in the current Gateway skeleton.
+
+```text
+POST /api/roles/list
+POST /api/roles/create
+POST /api/roles/select
+```
+
+**Note**: The current server only implements `/health`. Login and role selection interfaces are design-only and have no server business implementation yet.
+
 ## Not Implemented Yet
 
 - Login business logic.
@@ -109,4 +121,4 @@ Response example:
 
 ## Next Step
 
-Phase 1 Task 4: role selection flow design.
+Phase 1 Task 5: empty city screen design.
