@@ -3,18 +3,20 @@ using UnityEngine.UI;
 
 namespace MmoDemo.Client
 {
-    /// <summary>
-    /// Phase 4 quest tracker overlay. Shows active quest progress and accept buttons.
-    /// Attach to a child of CityView canvas.
-    /// </summary>
     public class QuestTracker : MonoBehaviour
     {
-        [SerializeField] private Text statusText;
-        [SerializeField] private Button acceptQuest1Btn;
-        [SerializeField] private Button acceptQuest2Btn;
-        [SerializeField] private Button acceptQuest3Btn;
-
+        private Text _statusText;
+        private Button _btn1, _btn2, _btn3;
         private GameManager _gm;
+
+        public void SetUI(Text statusText, Button quest1, Button quest2, Button quest3)
+        {
+            _statusText = statusText;
+            _btn1 = quest1; _btn2 = quest2; _btn3 = quest3;
+            _btn1?.onClick.AddListener(() => AcceptQuest(1));
+            _btn2?.onClick.AddListener(() => AcceptQuest(2));
+            _btn3?.onClick.AddListener(() => AcceptQuest(3));
+        }
 
         private void Start()
         {
@@ -24,29 +26,52 @@ namespace MmoDemo.Client
                 _gm.OnQuestUpdated += OnUpdated;
                 _gm.OnQuestCompleted += OnCompleted;
             }
+        }
 
-            acceptQuest1Btn?.onClick.AddListener(() => _gm?.SendAcceptQuest(1));
-            acceptQuest2Btn?.onClick.AddListener(() => _gm?.SendAcceptQuest(2));
-            acceptQuest3Btn?.onClick.AddListener(() => _gm?.SendAcceptQuest(3));
+        private void Update()
+        {
+            if (_gm == null)
+            {
+                _gm = FindObjectOfType<GameManager>();
+                if (_gm != null)
+                {
+                    _gm.OnQuestUpdated += OnUpdated;
+                    _gm.OnQuestCompleted += OnCompleted;
+                }
+            }
+        }
+
+        private void AcceptQuest(int questId)
+        {
+            if (_gm == null)
+            {
+                _gm = FindObjectOfType<GameManager>();
+                if (_gm != null)
+                {
+                    _gm.OnQuestUpdated += OnUpdated;
+                    _gm.OnQuestCompleted += OnCompleted;
+                }
+            }
+            _gm?.SendAcceptQuest(questId);
         }
 
         private void OnUpdated(string info)
         {
-            statusText.text = info;
+            if (_statusText != null) _statusText.text = info;
             SetButtons(false);
         }
 
         private void OnCompleted(string info)
         {
-            statusText.text = info;
+            if (_statusText != null) _statusText.text = info;
             SetButtons(true);
         }
 
         private void SetButtons(bool visible)
         {
-            if (acceptQuest1Btn) acceptQuest1Btn.gameObject.SetActive(visible);
-            if (acceptQuest2Btn) acceptQuest2Btn.gameObject.SetActive(visible);
-            if (acceptQuest3Btn) acceptQuest3Btn.gameObject.SetActive(visible);
+            if (_btn1) _btn1.gameObject.SetActive(visible);
+            if (_btn2) _btn2.gameObject.SetActive(visible);
+            if (_btn3) _btn3.gameObject.SetActive(visible);
         }
 
         private void OnDestroy()

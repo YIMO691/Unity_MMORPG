@@ -203,65 +203,6 @@ namespace MmoDemo.Client.Editor
             var statusTxt = CreateText("Entering city...", go.transform, "StatusText");
             statusTxt.rectTransform.anchoredPosition = new Vector2(0, -60);
 
-            // Phase 4: Chat panel (bottom-left overlay)
-            var chatGo = new GameObject("ChatPanel", typeof(RectTransform));
-            chatGo.transform.SetParent(go.transform, false);
-            var chatPanel = chatGo.AddComponent<ChatPanel>();
-            var chatSo = new SerializedObject(chatPanel);
-
-            var chatLog = CreateText("", chatGo.transform, "ChatLog");
-            chatLog.rectTransform.anchoredPosition = new Vector2(-300, -200);
-            chatLog.rectTransform.sizeDelta = new Vector2(280, 160);
-            chatLog.alignment = TextAnchor.LowerLeft;
-
-            var inputGo = CreateUIElement("ChatInput", chatGo.transform, new Vector2(-300, -280), new Vector2(200, 30));
-            inputGo.AddComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
-            var chatInput = inputGo.AddComponent<InputField>();
-            var inputTxtGo = new GameObject("Text", typeof(RectTransform), typeof(Text));
-            inputTxtGo.transform.SetParent(inputGo.transform, false);
-            var inputTxt = inputTxtGo.GetComponent<Text>();
-            inputTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            inputTxt.fontSize = 14;
-            inputTxt.color = Color.white;
-            inputTxt.alignment = TextAnchor.MiddleLeft;
-            inputTxt.rectTransform.sizeDelta = new Vector2(190, 26);
-            chatInput.textComponent = inputTxt;
-
-            var sendBtnGo = CreateUIElement("SendBtn", chatGo.transform, new Vector2(-70, -280), new Vector2(50, 30));
-            sendBtnGo.AddComponent<Image>().color = new Color(0.2f, 0.6f, 0.2f);
-            var sendBtn = sendBtnGo.AddComponent<Button>();
-            CreateText("Send", sendBtnGo.transform, "Label");
-
-            chatSo.FindProperty("chatLog").objectReferenceValue = chatLog;
-            chatSo.FindProperty("inputField").objectReferenceValue = chatInput;
-            chatSo.FindProperty("sendButton").objectReferenceValue = sendBtn;
-            chatSo.ApplyModifiedProperties();
-
-            // Phase 4: Quest tracker (top-right overlay)
-            var questGo = new GameObject("QuestTracker", typeof(RectTransform));
-            questGo.transform.SetParent(go.transform, false);
-            var questTracker = questGo.AddComponent<QuestTracker>();
-            var questSo = new SerializedObject(questTracker);
-
-            var questStatus = CreateText("Press a quest button to begin", questGo.transform, "QuestStatus");
-            questStatus.rectTransform.anchoredPosition = new Vector2(300, 260);
-            questStatus.rectTransform.sizeDelta = new Vector2(280, 40);
-            questStatus.fontSize = 16;
-            questStatus.alignment = TextAnchor.UpperRight;
-
-            var q1Btn = CreateButton("Quest1Btn", questGo.transform, new Vector2(300, 220), "Slime x3");
-            q1Btn.GetComponent<RectTransform>().sizeDelta = new Vector2(140, 30);
-            var q2Btn = CreateButton("Quest2Btn", questGo.transform, new Vector2(300, 185), "Goblins x2");
-            q2Btn.GetComponent<RectTransform>().sizeDelta = new Vector2(140, 30);
-            var q3Btn = CreateButton("Quest3Btn", questGo.transform, new Vector2(300, 150), "Wolf x1");
-            q3Btn.GetComponent<RectTransform>().sizeDelta = new Vector2(140, 30);
-
-            questSo.FindProperty("statusText").objectReferenceValue = questStatus;
-            questSo.FindProperty("acceptQuest1Btn").objectReferenceValue = q1Btn;
-            questSo.FindProperty("acceptQuest2Btn").objectReferenceValue = q2Btn;
-            questSo.FindProperty("acceptQuest3Btn").objectReferenceValue = q3Btn;
-            questSo.ApplyModifiedProperties();
-
             var view = go.GetComponent<CityView>();
             var so = new SerializedObject(view);
             so.FindProperty("nameText").objectReferenceValue = nameTxt;
