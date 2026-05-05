@@ -14,6 +14,7 @@ namespace MmoDemo.Client.Editor
         [MenuItem("MmoDemo/Setup All Scenes")]
         public static void CreateAll()
         {
+            CreatePlayerPrefabs();
             CreateUIPrefabs();
             AssetDatabase.Refresh();
             CreateBootstrapScene();
@@ -21,33 +22,55 @@ namespace MmoDemo.Client.Editor
             Debug.Log("[SceneSetup] All scenes and prefabs created.");
         }
 
+        public static void CreatePlayerPrefabs()
+        {
+            // Local player prefab (blue capsule)
+            var localPlayer = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            localPlayer.name = "LocalPlayer";
+            localPlayer.GetComponent<Renderer>().sharedMaterial.color = Color.blue;
+            SavePrefab(localPlayer, "LocalPlayer");
+
+            // Other player prefab (red capsule)
+            var otherPlayer = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            otherPlayer.name = "OtherPlayer";
+            otherPlayer.GetComponent<Renderer>().sharedMaterial.color = Color.red;
+            SavePrefab(otherPlayer, "OtherPlayer");
+        }
+
         public static void CreateBootstrapScene()
         {
-            // Load the prefabs created by CreateUIPrefabs
             var loginPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/LoginView.prefab");
             var rolePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/RoleSelectView.prefab");
             var cityPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/CityView.prefab");
+            var localPlayerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/LocalPlayer.prefab");
+            var otherPlayerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/OtherPlayer.prefab");
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
-            // ── GameLauncher GameObject ──
+            // GameLauncher
             var launcherObj = new GameObject("GameLauncher");
             var launcher = launcherObj.AddComponent<GameLauncher>();
+            var launcherSo = new SerializedObject(launcher);
+            launcherSo.FindProperty("loginViewPrefab").objectReferenceValue = loginPrefab;
+            launcherSo.FindProperty("roleSelectViewPrefab").objectReferenceValue = rolePrefab;
+            launcherSo.FindProperty("cityViewPrefab").objectReferenceValue = cityPrefab;
+            launcherSo.ApplyModifiedProperties();
 
-            // ── EventSystem (required for UI) ──
-            var eventSystem = new GameObject("EventSystem");
-            eventSystem.AddComponent<UnityEngine.EventSystems.EventSystem>();
-            eventSystem.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            // GameManager (Phase 2)
+            var gmObj = new GameObject("GameManager");
+            var gm = gmObj.AddComponent<GameManager>();
+            var gmSo = new SerializedObject(gm);
+            gmSo.FindProperty("localPlayerPrefab").objectReferenceValue = localPlayerPrefab;
+            gmSo.FindProperty("otherPlayerPrefab").objectReferenceValue = otherPlayerPrefab;
+            gmSo.ApplyModifiedProperties();
 
-            // Wire up prefab references on GameLauncher
-            var so = new SerializedObject(launcher);
-            so.FindProperty("loginViewPrefab").objectReferenceValue = loginPrefab;
-            so.FindProperty("roleSelectViewPrefab").objectReferenceValue = rolePrefab;
-            so.FindProperty("cityViewPrefab").objectReferenceValue = cityPrefab;
-            so.ApplyModifiedProperties();
+            // EventSystem
+            var eventSys = new GameObject("EventSystem");
+            eventSys.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            eventSys.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
 
             EditorSceneManager.SaveScene(scene, "Assets/_Scenes/Bootstrap.unity", false);
-            Debug.Log("[SceneSetup] Bootstrap scene created with prefab references.");
+            Debug.Log("[SceneSetup] Bootstrap scene created with Phase 2 GameManager.");
         }
 
         public static void CreateUIPrefabs()

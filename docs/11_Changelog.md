@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-05-05 — Phase 2: Scene + Entity + Movement Sync
+
+### Server — WebSocket Real-time Infrastructure
+- Added WebSocket endpoint at `/ws` with full message framing (Envelope pattern)
+- Entity system: `Entity`, `PlayerEntity`, `EntityType` domain models
+- Scene system: `Scene` domain model with entity tracking
+- WebSocketHandler: connection lifecycle, message read loop, cleanup on disconnect
+- MessageRouter: dispatches Auth / EnterScene / Move / Ping messages
+- SceneManager: singleton managing connections, entities, scenes, and broadcasts
+- MovementService: server-authoritative position validation with anti-cheat bounds
+- All in-memory, no database dependency
+
+### Server — Message Protocol (JSON over WebSocket)
+| Type | Dir | Purpose |
+|------|-----|---------|
+| c2s.auth / s2c.auth_result | ⇄ | Authenticate player+token+role over WebSocket |
+| c2s.enter_scene / s2c.enter_scene_result | ⇄ | Enter scene, receive entity list + spawn position |
+| c2s.move | → | Move intent (direction + client position) |
+| s2c.entity_snapshot | ← | Broadcast: entity position updates |
+| s2c.entity_joined / s2c.entity_left | ← | Broadcast: entity enter/leave scene |
+
+### Tests — 13/13 passing
+- 10 Phase 1 tests (HTTP API)
+- 3 Phase 2 WebSocket tests (auth + enter scene + ping, bad auth rejected, unauthenticated rejected)
+
+### Unity Client — Phase 2 Scripts
+- `WebSocketClient.cs` — ClientWebSocket wrapper with main-thread message dispatch
+- `GameManager.cs` — Phase 2 game state: connects WS, spawns entities, handles WASD movement
+- `CityView.cs` — Updated to trigger GameManager after Phase 1 city entry
+- `SceneSetup.cs` — Updated to create GameManager + player prefabs (blue/red capsules)
+
 ## 2026-05-04 — Phase 1 Implementation Complete
 
 ### Server Implementation

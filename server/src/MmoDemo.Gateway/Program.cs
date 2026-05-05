@@ -1,71 +1,72 @@
+using System.Net.WebSockets;
 using MmoDemo.Application;
 using MmoDemo.Contracts;
+using MmoDemo.Domain;
 using MmoDemo.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── In-memory repositories ──
+// ── In-memory repositories (Phase 1) ──
 builder.Services.AddSingleton<IPlayerRepository, InMemoryPlayerStore>();
 builder.Services.AddSingleton<IRoleRepository, InMemoryRoleStore>();
 
-// ── Application services ──
+// ── Application services (Phase 1) ──
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IRoleService, RoleService>();
 builder.Services.AddSingleton<ISceneService, SceneService>();
 
-var app = builder.Build();
+// ── Application services (Phase 2) ──
+builder.Services.AddSingleton<IMovementService, MovementService>();
+builder.Services.AddSingleton<ISceneManager, SceneManager>();
+builder.Services.AddSingleton<IMessageRouter, MessageRouter>();
+builder.Services.AddSingleton<IWebSocketHandler, WebSocketHandler>();
 
-// ── Health check ──
+var app = builder.Build();
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
+
+// ── Initialize default city scene ──
+var sceneManager = app.Services.GetRequiredService<ISceneManager>();
+sceneManager.AddScene(new Scene
+{
+    SceneId = "city_001",
+    SceneName = "Main City",
+    SpawnX = 0, SpawnY = 0, SpawnZ = 0,
+    BoundsMinX = -50, BoundsMaxX = 50,
+    BoundsMinZ = -50, BoundsMaxZ = 50
+});
+
+// ═══════════════ Phase 1 HTTP Endpoints ═══════════════
+
 app.MapGet("/health", () => Results.Ok(new
 {
-    Status = "OK",
-    Service = "MmoDemo.Gateway",
-    Phase = "Phase 1"
+    Status = "OK", Service = "MmoDemo.Gateway", Phase = "Phase 2"
 }));
 
-// ── Guest Login ──
-app.MapPost("/api/auth/guest-login", (GuestLoginRequest request, IAuthService auth) =>
-{
-    var response = auth.GuestLogin(request);
-    return response.Code == ErrorCodes.Ok
-        ? Results.Ok(response)
-        : Results.BadRequest(response);
-});
+app.MapPost("/api/auth/guest-login", (GuestLoginRequest r, IAuthService s) =>
+    s.GuestLogin(r) is { Code: ErrorCodes.Ok } res ? Results.Ok(res) : Results.BadRequest(s.GuestLogin(r)));
 
-// ── Role List ──
-app.MapPost("/api/roles/list", (GetRoleListRequest request, IRoleService roles) =>
-{
-    var response = roles.GetRoleList(request);
-    return response.Code == ErrorCodes.Ok
-        ? Results.Ok(response)
-        : Results.BadRequest(response);
-});
+app.MapPost("/api/roles/list", (GetRoleListRequest r, IRoleService s) =>
+    s.GetRoleList(r) is { Code: ErrorCodes.Ok } res ? Results.Ok(res) : Results.BadRequest(s.GetRoleList(r)));
 
-// ── Create Role ──
-app.MapPost("/api/roles/create", (CreateRoleRequest request, IRoleService roles) =>
-{
-    var response = roles.CreateRole(request);
-    return response.Code == ErrorCodes.Ok
-        ? Results.Ok(response)
-        : Results.BadRequest(response);
-});
+app.MapPost("/api/roles/create", (CreateRoleRequest r, IRoleService s) =>
+    s.CreateRole(r) is { Code: ErrorCodes.Ok } res ? Results.Ok(res) : Results.BadRequest(s.CreateRole(r)));
 
-// ── Select Role ──
-app.MapPost("/api/roles/select", (SelectRoleRequest request, IRoleService roles) =>
-{
-    var response = roles.SelectRole(request);
-    return response.Code == ErrorCodes.Ok
-        ? Results.Ok(response)
-        : Results.BadRequest(response);
-});
+app.MapPost("/api/roles/select", (SelectRoleRequest r, IRoleService s) =>
+    s.SelectRole(r) is { Code: ErrorCodes.Ok } res ? Results.Ok(res) : Results.BadRequest(s.SelectRole(r)));
 
-// ── Enter City ──
-app.MapPost("/api/scene/enter-city", (EnterCityRequest request, ISceneService scene) =>
+app.MapPost("/api/scene/enter-city", (EnterCityRequest r, ISceneService s) =>
+    s.EnterCity(r) is { Code: ErrorCodes.Ok } res ? Results.Ok(res) : Results.BadRequest(s.EnterCity(r)));
+
+// ═══════════════ Phase 2 WebSocket ═══════════════
+
+var _connId = 0;
+
+app.Map("/ws", async (HttpContext ctx, IWebSocketHandler handler) =>
 {
-    var response = scene.EnterCity(request);
-    return response.Code == ErrorCodes.Ok
-        ? Results.Ok(response)
-        : Results.BadRequest(response);
+    if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
+    var socket = await ctx.WebSockets.AcceptWebSocketAsync();
+    var cid = $"conn_{Interlocked.Increment(ref _connId)}";
+    await handler.HandleConnectionAsync(socket, cid, ctx.RequestAborted);
 });
 
 app.Run();

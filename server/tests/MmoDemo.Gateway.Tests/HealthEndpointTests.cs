@@ -19,7 +19,7 @@ public class HealthEndpointTests
         Assert.NotNull(payload);
         Assert.Equal("OK", payload.Status);
         Assert.Equal("MmoDemo.Gateway", payload.Service);
-        Assert.Equal("Phase 1", payload.Phase);
+        Assert.Equal("Phase 2", payload.Phase);
     }
 
     private sealed record HealthResponse(string Status, string Service, string Phase);
