@@ -114,8 +114,15 @@ namespace MmoDemo.Client
             _localPlayer.GetComponent<Renderer>().material.color = Color.blue;
             _myEntityId = ExtractString(p, "\"entityId\":\"");
 
+            // Hide center HUD text but keep canvas active for chat/quest overlays
             foreach (var canvas in FindObjectsOfType<Canvas>())
-                canvas.gameObject.SetActive(false);
+            {
+                foreach (Transform child in canvas.transform)
+                {
+                    if (child.name is "NameText" or "LevelText" or "GoldText" or "StatusText")
+                        child.gameObject.SetActive(false);
+                }
+            }
 
             // Spawn entities from the list (players + monsters)
             var arr = ExtractJsonArray(p, "\"entities\":");

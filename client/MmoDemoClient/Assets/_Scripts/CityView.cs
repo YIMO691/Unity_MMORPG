@@ -28,6 +28,10 @@ namespace MmoDemo.Client
 
         private void BuildChatPanel()
         {
+            // Remove any old copy (from prefab or previous init)
+            var existing = transform.Find("ChatPanel");
+            if (existing != null) Destroy(existing.gameObject);
+
             // Container fills parent canvas
             var chatGo = NewUIChild("ChatPanel", transform);
             Stretch(chatGo);
@@ -78,6 +82,10 @@ namespace MmoDemo.Client
 
         private void BuildQuestTracker()
         {
+            // Remove any old copy (from prefab or previous init)
+            var existing = transform.Find("QuestTracker");
+            if (existing != null) Destroy(existing.gameObject);
+
             var questGo = NewUIChild("QuestTracker", transform);
             Stretch(questGo);
 
