@@ -84,8 +84,8 @@ public class WebSocketHandler : IWebSocketHandler
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[WS] Error processing message: {ex.Message}");
-            return BuildMessage(MessageTypes.AuthResult, new AuthResultPayload { Ok = false, Message = "Invalid message" });
+            Console.WriteLine($"[WS] Error: {ex.Message}");
+            return ""; // don't send wrong message type back
         }
     }
 

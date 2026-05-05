@@ -21,6 +21,12 @@ builder.Services.AddSingleton<ISceneManager, SceneManager>();
 builder.Services.AddSingleton<IMessageRouter, MessageRouter>();
 builder.Services.AddSingleton<IWebSocketHandler, WebSocketHandler>();
 
+// ── Application services (Phase 3) ──
+builder.Services.AddSingleton<ICombatService, CombatService>();
+builder.Services.AddSingleton<MonsterService>();
+builder.Services.AddSingleton<DropService>();
+builder.Services.AddSingleton<InventoryService>();
+
 var app = builder.Build();
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
 

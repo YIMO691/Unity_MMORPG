@@ -17,4 +17,6 @@ public interface ISceneManager
     void RegisterConnection(string connectionId, PlayerEntity player);
     void UnregisterConnection(string connectionId);
     void TrackConnection(string connectionId, WebSocket socket);
+    void AddEntity(string sceneId, Entity entity);
+    void RemoveEntityFromScene(string sceneId, string entityId);
 }

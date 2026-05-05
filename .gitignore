@@ -5,8 +5,9 @@
 .tools/
 __pycache__/
 *.pyc
-ai/outputs/*
-!ai/outputs/.gitkeep
+
+# Logs
+*.log
 
 # .NET build outputs
 [Bb]in/

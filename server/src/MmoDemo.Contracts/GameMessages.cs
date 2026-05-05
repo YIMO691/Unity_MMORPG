@@ -36,6 +36,24 @@ public static class MessageTypes
 
     public const string Ping = "c2s.ping";
     public const string Pong = "s2c.pong";
+
+    // Phase 3: Combat
+    public const string CastSkill = "c2s.cast_skill";
+    public const string CombatEvent = "s2c.combat_event";
+
+    // Phase 3: Monster
+    public const string MonsterSpawned = "s2c.monster_spawned";
+    public const string MonsterDeath = "s2c.monster_death";
+    public const string MonsterSnapshot = "s2c.monster_snapshot";
+
+    // Phase 3: Drop & Inventory
+    public const string DropSpawned = "s2c.drop_spawned";
+    public const string PickupItem = "c2s.pickup_item";
+    public const string DropPickedUp = "s2c.drop_picked_up";
+    public const string GetInventory = "c2s.get_inventory";
+    public const string InventoryData = "s2c.inventory_data";
+    public const string UseItem = "c2s.use_item";
+    public const string EquipItem = "c2s.equip_item";
 }
 
 // ── Payloads ──
@@ -149,4 +167,126 @@ public class EntityLeftPayload
 {
     [JsonPropertyName("entityId")]
     public string EntityId { get; set; } = "";
+}
+
+// ═══════════ Phase 3 Payloads ═══════════
+
+public class CastSkillPayload
+{
+    [JsonPropertyName("targetId")]
+    public string TargetId { get; set; } = "";
+
+    [JsonPropertyName("skillId")]
+    public int SkillId { get; set; }
+}
+
+public class CombatEventPayload
+{
+    [JsonPropertyName("casterId")]
+    public string CasterId { get; set; } = "";
+
+    [JsonPropertyName("targetId")]
+    public string TargetId { get; set; } = "";
+
+    [JsonPropertyName("damage")]
+    public int Damage { get; set; }
+
+    [JsonPropertyName("crit")]
+    public bool Crit { get; set; }
+
+    [JsonPropertyName("targetDied")]
+    public bool TargetDied { get; set; }
+
+    [JsonPropertyName("casterHp")]
+    public int CasterHp { get; set; }
+}
+
+public class MonsterDeathPayload
+{
+    [JsonPropertyName("entityId")]
+    public string EntityId { get; set; } = "";
+
+    [JsonPropertyName("killerId")]
+    public string KillerId { get; set; } = "";
+
+    [JsonPropertyName("expReward")]
+    public int ExpReward { get; set; }
+
+    [JsonPropertyName("goldReward")]
+    public int GoldReward { get; set; }
+}
+
+public class DropSpawnedPayload
+{
+    [JsonPropertyName("dropId")]
+    public string DropId { get; set; } = "";
+
+    [JsonPropertyName("itemTemplateId")]
+    public int ItemTemplateId { get; set; }
+
+    [JsonPropertyName("itemName")]
+    public string ItemName { get; set; } = "";
+
+    [JsonPropertyName("posX")]
+    public float PosX { get; set; }
+
+    [JsonPropertyName("posZ")]
+    public float PosZ { get; set; }
+}
+
+public class PickupItemPayload
+{
+    [JsonPropertyName("dropId")]
+    public string DropId { get; set; } = "";
+}
+
+public class DropPickedUpPayload
+{
+    [JsonPropertyName("dropId")]
+    public string DropId { get; set; } = "";
+
+    [JsonPropertyName("pickedBy")]
+    public string PickedBy { get; set; } = "";
+}
+
+public class InventoryItemData
+{
+    [JsonPropertyName("templateId")]
+    public int TemplateId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "";
+
+    [JsonPropertyName("quantity")]
+    public int Quantity { get; set; }
+
+    [JsonPropertyName("slotIndex")]
+    public int SlotIndex { get; set; }
+
+    [JsonPropertyName("equipped")]
+    public bool Equipped { get; set; }
+}
+
+public class InventoryDataPayload
+{
+    [JsonPropertyName("items")]
+    public List<InventoryItemData> Items { get; set; } = [];
+
+    [JsonPropertyName("playerHp")]
+    public int PlayerHp { get; set; }
+}
+
+public class UseItemPayload
+{
+    [JsonPropertyName("templateId")]
+    public int TemplateId { get; set; }
+}
+
+public class EquipItemPayload
+{
+    [JsonPropertyName("templateId")]
+    public int TemplateId { get; set; }
 }

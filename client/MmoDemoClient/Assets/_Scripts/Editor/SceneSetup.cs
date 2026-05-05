@@ -15,6 +15,7 @@ namespace MmoDemo.Client.Editor
         public static void CreateAll()
         {
             CreatePlayerPrefabs();
+            CreatePhase3Prefabs();
             CreateUIPrefabs();
             AssetDatabase.Refresh();
             CreateBootstrapScene();
@@ -24,17 +25,37 @@ namespace MmoDemo.Client.Editor
 
         public static void CreatePlayerPrefabs()
         {
-            // Local player prefab (blue capsule)
-            var localPlayer = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            localPlayer.name = "LocalPlayer";
-            localPlayer.GetComponent<Renderer>().sharedMaterial.color = Color.blue;
-            SavePrefab(localPlayer, "LocalPlayer");
+            var lp = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            lp.name = "LocalPlayer";
+            SavePrefab(lp, "LocalPlayer");
 
-            // Other player prefab (red capsule)
-            var otherPlayer = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            otherPlayer.name = "OtherPlayer";
-            otherPlayer.GetComponent<Renderer>().sharedMaterial.color = Color.red;
-            SavePrefab(otherPlayer, "OtherPlayer");
+            var op = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            op.name = "OtherPlayer";
+            SavePrefab(op, "OtherPlayer");
+        }
+
+        public static void CreatePhase3Prefabs()
+        {
+            // Monster prefab (green cube)
+            var monster = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            monster.name = "Monster";
+            SavePrefab(monster, "Monster");
+
+            // Drop prefab (yellow sphere)
+            var drop = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            drop.name = "Drop";
+            drop.transform.localScale = Vector3.one * 0.3f;
+            SavePrefab(drop, "Drop");
+
+            // Damage text prefab
+            var dt = new GameObject("DamageText");
+            var tm = dt.AddComponent<TextMesh>();
+            tm.text = "0";
+            tm.fontSize = 36;
+            tm.alignment = TextAlignment.Center;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.color = Color.white;
+            SavePrefab(dt, "DamageText");
         }
 
         public static void CreateBootstrapScene()
@@ -44,6 +65,9 @@ namespace MmoDemo.Client.Editor
             var cityPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/CityView.prefab");
             var localPlayerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/LocalPlayer.prefab");
             var otherPlayerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/OtherPlayer.prefab");
+            var monsterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/Monster.prefab");
+            var dropPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/Drop.prefab");
+            var damagePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Prefabs/DamageText.prefab");
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
@@ -62,6 +86,9 @@ namespace MmoDemo.Client.Editor
             var gmSo = new SerializedObject(gm);
             gmSo.FindProperty("localPlayerPrefab").objectReferenceValue = localPlayerPrefab;
             gmSo.FindProperty("otherPlayerPrefab").objectReferenceValue = otherPlayerPrefab;
+            gmSo.FindProperty("monsterPrefab").objectReferenceValue = monsterPrefab;
+            gmSo.FindProperty("dropPrefab").objectReferenceValue = dropPrefab;
+            gmSo.FindProperty("damageTextPrefab").objectReferenceValue = damagePrefab;
             gmSo.ApplyModifiedProperties();
 
             // EventSystem

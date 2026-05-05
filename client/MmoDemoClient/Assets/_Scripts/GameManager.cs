@@ -1,162 +1,281 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
 using UnityEngine;
 
 namespace MmoDemo.Client
 {
     /// <summary>
-    /// Phase 2 game state manager. Handles WebSocket connection, movement,
-    /// and entity sync after Phase 1 login/role selection.
+    /// Phase 3 game manager. Phase 2 movement + monsters, combat, drops, inventory.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
         [SerializeField] private string wsUrl = "ws://localhost:5000/ws";
-        [SerializeField] private GameObject otherPlayerPrefab;
         [SerializeField] private GameObject localPlayerPrefab;
+        [SerializeField] private GameObject otherPlayerPrefab;
+        [SerializeField] private GameObject monsterPrefab;
+        [SerializeField] private GameObject dropPrefab;
+        [SerializeField] private GameObject damageTextPrefab;
 
         private WebSocketClient _ws;
-        private string _playerId;
-        private string _token;
-        private string _roleId;
-        private string _myEntityId;
-
+        private string _playerId, _token, _roleId, _myEntityId;
         private readonly Dictionary<string, GameObject> _entities = new();
+        private readonly Dictionary<string, GameObject> _drops = new();
         private GameObject _localPlayer;
+        private int _score;
 
         public bool IsReady { get; private set; }
 
+        // ═══════════ Connection ═══════════
+
         public async void Connect(string playerId, string token, string roleId)
         {
-            _playerId = playerId;
-            _token = token;
-            _roleId = roleId;
-
+            _playerId = playerId; _token = token; _roleId = roleId;
             _ws = new WebSocketClient(wsUrl);
             _ws.OnMessage += OnWsMessage;
             _ws.OnDisconnected += OnDisconnected;
-
             await _ws.ConnectAsync();
             SendAuth();
         }
 
-        private async void SendAuth()
-        {
-            var payload = $"{{\"playerId\":\"{_playerId}\",\"token\":\"{_token}\",\"roleId\":\"{_roleId}\"}}";
-            await _ws.SendAsync("c2s.auth", payload);
-        }
+        private async void SendAuth() =>
+            await _ws.SendAsync("c2s.auth", $"{{\"playerId\":\"{_playerId}\",\"token\":\"{_token}\",\"roleId\":\"{_roleId}\"}}");
 
-        private async void SendEnterScene(string sceneId)
-        {
-            var payload = $"{{\"sceneId\":\"{sceneId}\"}}";
-            await _ws.SendAsync("c2s.enter_scene", payload);
-        }
+        private async void SendEnterScene(string s) =>
+            await _ws.SendAsync("c2s.enter_scene", $"{{\"sceneId\":\"{s}\"}}");
 
-        private async void SendMove(float dirX, float dirZ, float posX, float posZ)
-        {
-            var payload = "{\"dirX\":" + dirX.ToString("F2") +
-                ",\"dirY\":0,\"dirZ\":" + dirZ.ToString("F2") +
-                ",\"posX\":" + posX.ToString("F2") +
-                ",\"posY\":0,\"posZ\":" + posZ.ToString("F2") + "}";
-            await _ws.SendAsync("c2s.move", payload);
-        }
+        private async void SendMove(float dx, float dz, float px, float pz) =>
+            await _ws.SendAsync("c2s.move",
+                "{\"dirX\":" + dx.ToString("F2") + ",\"dirY\":0,\"dirZ\":" + dz.ToString("F2") +
+                ",\"posX\":" + px.ToString("F2") + ",\"posY\":0,\"posZ\":" + pz.ToString("F2") + "}");
+
+        private async void SendCastSkill(string targetId, int skillId) =>
+            await _ws.SendAsync("c2s.cast_skill", $"{{\"targetId\":\"{targetId}\",\"skillId\":{skillId}}}");
+
+        // ═══════════ Message Router ═══════════
 
         private void OnWsMessage(string type, string payload)
         {
+            Debug.Log($"[Game] Received: type={type} payload={payload[..Math.Min(payload.Length, 100)]}");
             switch (type)
             {
                 case "s2c.auth_result":
-                    HandleAuthResult(payload);
+                    Debug.Log("[Game] Auth response: " + payload);
+                    if (ExtractBool(payload, "\"ok\":")) SendEnterScene("city_001");
+                    else Debug.LogError("[Game] Auth failed: " + payload);
                     break;
                 case "s2c.enter_scene_result":
-                    HandleEnterSceneResult(payload);
-                    break;
+                    HandleEnterScene(payload); break;
                 case "s2c.entity_snapshot":
-                    HandleEntitySnapshot(payload);
-                    break;
+                    HandleSnapshot(payload); break;
                 case "s2c.entity_joined":
-                    HandleEntityJoined(payload);
+                    SpawnEntity(ExtractNested(payload, "\"entity\":"));
                     break;
                 case "s2c.entity_left":
-                    HandleEntityLeft(payload);
+                    DespawnEntity(ExtractString(payload, "\"entityId\":\""));
                     break;
+                case "s2c.combat_event":
+                    HandleCombatEvent(payload); break;
+                case "s2c.monster_death":
+                    HandleMonsterDeath(payload); break;
+                case "s2c.drop_spawned":
+                    HandleDropSpawned(payload); break;
+                case "s2c.drop_picked_up":
+                    HandleDropPickedUp(payload); break;
+                case "s2c.inventory_data":
+                    HandleInventory(payload); break;
             }
         }
 
-        private void HandleAuthResult(string payload)
-        {
-            var ok = ExtractBool(payload, "\"ok\":");
-            if (ok)
-            {
-                Debug.Log("[Game] Auth OK, entering city...");
-                SendEnterScene("city_001");
-            }
-            else
-            {
-                Debug.LogError("[Game] Auth failed: " + ExtractString(payload, "\"message\":"));
-            }
-        }
+        // ═══════════ Scene Entry ═══════════
 
-        private void HandleEnterSceneResult(string payload)
+        private void HandleEnterScene(string p)
         {
-            var ok = ExtractBool(payload, "\"ok\":");
-            if (!ok) { Debug.LogError("[Game] Enter scene failed"); return; }
-
-            // Spawn local player
-            var spawnX = ExtractFloat(payload, "\"spawnX\":");
-            var spawnZ = ExtractFloat(payload, "\"spawnZ\":");
-            _localPlayer = Instantiate(localPlayerPrefab, new Vector3(spawnX, 1, spawnZ), Quaternion.identity);
+            if (!ExtractBool(p, "\"ok\":")) return;
+            var sx = ExtractFloat(p, "\"spawnX\":");
+            var sz = ExtractFloat(p, "\"spawnZ\":");
+            _localPlayer = Instantiate(localPlayerPrefab, new Vector3(sx, 1, sz), Quaternion.identity);
             _localPlayer.GetComponent<Renderer>().material.color = Color.blue;
-            _myEntityId = ExtractString(payload, "\"entityId\":\"");
+            _myEntityId = ExtractString(p, "\"entityId\":\"");
 
-            // Hide all UI canvases
             foreach (var canvas in FindObjectsOfType<Canvas>())
                 canvas.gameObject.SetActive(false);
 
-            // Spawn existing entities
-            var entitiesStart = payload.IndexOf("\"entities\":[");
-            var entitiesEnd = payload.LastIndexOf("]");
-            if (entitiesStart > 0)
-            {
-                var entitiesJson = payload.Substring(entitiesStart + 12, entitiesEnd - entitiesStart - 11);
-                foreach (var entityJson in SplitJsonArray(entitiesJson))
-                    SpawnEntity(entityJson);
-            }
+            // Spawn entities from the list (players + monsters)
+            var arr = ExtractJsonArray(p, "\"entities\":");
+            foreach (var ej in arr)
+                SpawnEntity(ej);
 
             IsReady = true;
-            Debug.Log("[Game] Scene entered! Spawned at " + spawnX + "," + spawnZ);
+            Debug.Log("[Game] Scene entered. Score: 0");
         }
 
-        private void HandleEntitySnapshot(string payload)
+        // ═══════════ Entity Spawning ═══════════
+
+        private void SpawnEntity(string json)
         {
-            if (!IsReady) return;
+            var eid = ExtractString(json, "\"entityId\":\"");
+            if (string.IsNullOrEmpty(eid) || eid == _myEntityId || _entities.ContainsKey(eid)) return;
 
-            // Parse entities array
-            var entitiesStart = payload.IndexOf("\"entities\":[");
-            var entitiesEnd = payload.LastIndexOf("]");
-            if (entitiesStart < 0) return;
+            var etype = ExtractString(json, "\"type\":\"");
+            var x = ExtractFloat(json, "\"posX\":");
+            var z = ExtractFloat(json, "\"posZ\":");
+            var name = ExtractString(json, "\"name\":\"");
 
-            var entitiesJson = payload.Substring(entitiesStart + 12, entitiesEnd - entitiesStart - 11);
-            foreach (var entityJson in SplitJsonArray(entitiesJson))
-                UpdateEntity(entityJson);
+            GameObject go;
+            if (etype == "monster")
+            {
+                go = Instantiate(monsterPrefab, new Vector3(x, 1, z), Quaternion.identity);
+                go.GetComponent<Renderer>().material.color = new Color(0.2f, 0.8f, 0.2f); // green
+            }
+            else
+            {
+                go = Instantiate(otherPlayerPrefab, new Vector3(x, 1, z), Quaternion.identity);
+                go.GetComponent<Renderer>().material.color = Color.red;
+            }
+
+            go.name = $"{name}({eid[..6]})";
+            _entities[eid] = go;
         }
 
-        private void HandleEntityJoined(string payload)
+        private void UpdateEntity(string json)
         {
-            var entityStart = payload.IndexOf("\"entity\":{");
-            var entityEnd = payload.LastIndexOf("}");
-            if (entityStart < 0) return;
-
-            var entityJson = payload.Substring(entityStart + 9, entityEnd - entityStart - 8);
-            SpawnEntity(entityJson);
+            var eid = ExtractString(json, "\"entityId\":\"");
+            if (eid == _myEntityId || !_entities.TryGetValue(eid, out var go)) return;
+            go.transform.position = Vector3.Lerp(go.transform.position,
+                new Vector3(ExtractFloat(json, "\"posX\":"), 0, ExtractFloat(json, "\"posZ\":")), 0.3f);
         }
 
-        private void HandleEntityLeft(string payload)
+        private void DespawnEntity(string eid)
         {
-            var entityId = ExtractString(payload, "\"entityId\":\"");
-            if (!string.IsNullOrEmpty(entityId))
-                DespawnEntity(entityId);
+            if (_entities.TryGetValue(eid, out var go)) { Destroy(go); _entities.Remove(eid); }
+        }
+
+        // ═══════════ Phase 3: Combat ═══════════
+
+        private string _nearestMonsterId;
+
+        private void HandleCombatEvent(string p)
+        {
+            var dmg = (int)ExtractFloat(p, "\"damage\":");
+            var crit = ExtractBool(p, "\"crit\":");
+            var targetDied = ExtractBool(p, "\"targetDied\":");
+            var targetId = ExtractString(p, "\"targetId\":\"");
+            var casterHp = (int)ExtractFloat(p, "\"casterHp\":");
+
+            // Show damage text on target
+            if (_entities.TryGetValue(targetId, out var target))
+            {
+                var dt = Instantiate(damageTextPrefab, target.transform.position + Vector3.up * 2, Quaternion.identity);
+                var txt = dt.GetComponent<TextMesh>() ?? dt.AddComponent<TextMesh>();
+                txt.text = crit ? $"CRIT! {dmg}" : $"-{dmg}";
+                txt.color = crit ? Color.yellow : Color.white;
+                txt.fontSize = 36;
+                Destroy(dt, 1.5f);
+            }
+
+            if (targetDied && _entities.TryGetValue(targetId, out var dead))
+            {
+                Destroy(dead);
+                _entities.Remove(targetId);
+            }
+
+            _score += dmg;
+        }
+
+        private void HandleMonsterDeath(string p)
+        {
+            var eid = ExtractString(p, "\"entityId\":\"");
+            var exp = (int)ExtractFloat(p, "\"expReward\":");
+            var gold = (int)ExtractFloat(p, "\"goldReward\":");
+            DespawnEntity(eid);
+            _score += gold;
+            Debug.Log($"[Game] Monster killed! +{exp} exp +{gold} gold. Score: {_score}");
+        }
+
+        // ═══════════ Phase 3: Drops ═══════════
+
+        private void HandleDropSpawned(string p)
+        {
+            var dropId = ExtractString(p, "\"dropId\":\"");
+            var itemName = ExtractString(p, "\"itemName\":\"");
+            var x = ExtractFloat(p, "\"posX\":");
+            var z = ExtractFloat(p, "\"posZ\":");
+            var go = Instantiate(dropPrefab, new Vector3(x, 0.5f, z), Quaternion.identity);
+            go.name = itemName;
+            go.GetComponent<Renderer>().material.color = Color.yellow;
+            _drops[dropId] = go;
+        }
+
+        private void HandleDropPickedUp(string p)
+        {
+            var dropId = ExtractString(p, "\"dropId\":\"");
+            if (_drops.TryGetValue(dropId, out var go)) { Destroy(go); _drops.Remove(dropId); }
+        }
+
+        private void HandleInventory(string p)
+        {
+            var count = 0;
+            foreach (var item in ExtractJsonArray(p, "\"items\":"))
+                count++;
+            Debug.Log($"[Game] Inventory: {count} items");
+        }
+
+        // ═══════════ Snapshot ═══════════
+
+        private void HandleSnapshot(string p)
+        {
+            foreach (var ej in ExtractJsonArray(p, "\"entities\":"))
+                UpdateEntity(ej);
+        }
+
+        // ═══════════ Update ═══════════
+
+        private void Update()
+        {
+            _ws?.Update();
+            if (!IsReady || _localPlayer == null) return;
+
+            // Movement
+            var h = Input.GetAxis("Horizontal");
+            var v = Input.GetAxis("Vertical");
+            if (Mathf.Abs(h) > 0.01f || Mathf.Abs(v) > 0.01f)
+            {
+                var spd = 5f * Time.deltaTime;
+                var pos = _localPlayer.transform.position;
+                pos.x += h * spd; pos.z += v * spd;
+                _localPlayer.transform.position = pos;
+                SendMove(h, v, pos.x, pos.z);
+            }
+
+            // Skill hotkeys 1/2/3 → attack nearest monster
+            for (int skill = 1; skill <= 3; skill++)
+            {
+                if (Input.GetKeyDown(KeyCode.Alpha0 + skill))
+                    AttackNearest(skill);
+            }
+
+            // Auto-target: highlight nearest monster
+            UpdateNearestMonster();
+        }
+
+        private void UpdateNearestMonster()
+        {
+            float bestDist = 8f;
+            string bestId = null;
+            foreach (var kv in _entities)
+            {
+                if (kv.Value == null) continue;
+                var dist = Vector3.Distance(_localPlayer.transform.position, kv.Value.transform.position);
+                if (dist < bestDist) { bestDist = dist; bestId = kv.Key; }
+            }
+            _nearestMonsterId = bestId;
+        }
+
+        private void AttackNearest(int skillId)
+        {
+            if (string.IsNullOrEmpty(_nearestMonsterId)) return;
+            SendCastSkill(_nearestMonsterId, skillId);
+            Debug.Log($"[Game] Cast skill {skillId} → {_nearestMonsterId}");
         }
 
         private void OnDisconnected(string reason)
@@ -165,116 +284,60 @@ namespace MmoDemo.Client
             IsReady = false;
         }
 
-        // ── Entity management ──
+        private void OnDestroy() => _ws?.Dispose();
 
-        private void SpawnEntity(string json)
-        {
-            var entityId = ExtractString(json, "\"entityId\":\"");
-            if (string.IsNullOrEmpty(entityId) || entityId == _myEntityId || _entities.ContainsKey(entityId))
-                return;
-
-            var x = ExtractFloat(json, "\"posX\":");
-            var z = ExtractFloat(json, "\"posZ\":");
-            var name = ExtractString(json, "\"name\":\"");
-
-            var go = Instantiate(otherPlayerPrefab, new Vector3(x, 1, z), Quaternion.identity);
-            go.name = name;
-            go.GetComponent<Renderer>().material.color = Color.red;
-            _entities[entityId] = go;
-        }
-
-        private void UpdateEntity(string json)
-        {
-            var entityId = ExtractString(json, "\"entityId\":\"");
-            if (entityId == _myEntityId || !_entities.TryGetValue(entityId, out var go))
-                return;
-
-            var x = ExtractFloat(json, "\"posX\":");
-            var z = ExtractFloat(json, "\"posZ\":");
-            go.transform.position = Vector3.Lerp(go.transform.position, new Vector3(x, 0, z), 0.3f);
-        }
-
-        private void DespawnEntity(string entityId)
-        {
-            if (_entities.TryGetValue(entityId, out var go))
-            {
-                Destroy(go);
-                _entities.Remove(entityId);
-            }
-        }
-
-        // ── Update loop ──
-
-        private void Update()
-        {
-            _ws?.Update();
-            if (!IsReady || _localPlayer == null) return;
-
-            // Simple movement: WASD / arrows
-            var h = Input.GetAxis("Horizontal");
-            var v = Input.GetAxis("Vertical");
-
-            if (Mathf.Abs(h) > 0.01f || Mathf.Abs(v) > 0.01f)
-            {
-                var speed = 5f * Time.deltaTime;
-                var pos = _localPlayer.transform.position;
-                pos.x += h * speed;
-                pos.z += v * speed;
-                _localPlayer.transform.position = pos;
-
-                SendMove(h, v, pos.x, pos.z);
-            }
-        }
-
-        private void OnDestroy()
-        {
-            _ws?.Dispose();
-        }
-
-        // ── Simple JSON parsers (avoiding JsonUtility allocation overhead) ──
+        // ═══════════ JSON Helpers ═══════════
 
         private static float ExtractFloat(string json, string key)
         {
-            var i = json.IndexOf(key);
-            if (i < 0) return 0;
-            i += key.Length;
+            var i = json.IndexOf(key); if (i < 0) return 0; i += key.Length;
             var end = json.IndexOfAny(new[] { ',', '}', ' ' }, i);
             if (end < 0) end = json.Length;
             return float.TryParse(json.Substring(i, end - i), out var v) ? v : 0;
         }
 
         private static bool ExtractBool(string json, string key) =>
-            json.IndexOf(key + "true") >= 0;
+            json.IndexOf(key + "true", StringComparison.Ordinal) >= 0;
 
         private static string ExtractString(string json, string key)
         {
-            var i = json.IndexOf(key);
-            if (i < 0) return "";
-            i += key.Length;
-            if (i < json.Length && json[i] == '"') i++; // skip opening quote
+            var i = json.IndexOf(key); if (i < 0) return ""; i += key.Length;
+            if (i < json.Length && json[i] == '"') i++;
             var end = json.IndexOf('"', i);
-            if (end < 0) end = json.IndexOfAny(new[] { ',', '}' }, i);
-            if (end < 0) end = json.Length;
-            return json.Substring(i, end - i);
+            return end < 0 ? json[i..] : json[i..end];
         }
 
-        private static string[] SplitJsonArray(string json)
+        private static string ExtractNested(string json, string key)
         {
-            var items = new List<string>();
-            var depth = 0;
-            var start = 0;
-            for (var i = 0; i < json.Length; i++)
+            var i = json.IndexOf(key); if (i < 0) return "{}";
+            i += key.Length;
+            if (i >= json.Length || json[i] != '{') return "{}";
+            var depth = 1; var j = i + 1;
+            while (j < json.Length && depth > 0)
             {
-                if (json[i] == '{') depth++;
-                else if (json[i] == '}')
+                if (json[j] == '{') depth++;
+                else if (json[j] == '}') depth--;
+                j++;
+            }
+            return json[i..j];
+        }
+
+        private static string[] ExtractJsonArray(string json, string key)
+        {
+            var i = json.IndexOf(key); if (i < 0) return new string[0];
+            i += key.Length; if (i >= json.Length || json[i] != '[') return new string[0];
+            var depth = 1; var start = i + 1; var items = new List<string>();
+            var objDepth = 0;
+            for (var j = start; j < json.Length && depth > 0; j++)
+            {
+                if (json[j] == '{') objDepth++;
+                else if (json[j] == '}') objDepth--;
+                else if (json[j] == ',' && objDepth == 0 && depth > 0)
                 {
-                    depth--;
-                    if (depth == 0)
-                    {
-                        items.Add(json.Substring(start, i - start + 1));
-                        start = i + 2; // skip comma
-                    }
+                    items.Add(json[start..j]);
+                    start = j + 1;
                 }
+                else if (json[j] == ']' && objDepth == 0) { depth--; items.Add(json[start..j]); }
             }
             return items.ToArray();
         }

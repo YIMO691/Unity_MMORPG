@@ -2,14 +2,14 @@
 
 ## Project
 
-Unity + C# + Lua + .NET 9.0 MMORPG Demo. Phase 1 (Login / Role / City) in progress.
+Unity + C# + Lua + .NET 9.0 MMORPG Demo (resume portfolio vertical slice). Currently at Phase 3: combat, monsters, drops, and inventory over WebSocket.
 
 ## Current Status
 
-- **Server**: .NET 9.0 ASP.NET Core Minimal API, only `GET /health` works.
-- **Client**: Empty. `client/` contains docs only - no Unity project created yet.
-- **Proto**: Design drafts in `proto/` - no codegen.
-- **No**: Database, Redis, WebSocket, CI/CD, Docker.
+- **Server**: .NET 9.0 ASP.NET Core with HTTP endpoints + WebSocket, in-memory stores, message routing, combat/movement/drop/inventory services.
+- **Client**: Unity project with login → role select → city flow, WebSocket real-time gameplay (movement, combat, monsters, drops, inventory).
+- **Proto**: Design drafts in `proto/` — no codegen yet.
+- **No**: Database, Redis, CI/CD, Docker deployment.
 
 ## Commands
 
@@ -19,16 +19,6 @@ Unity + C# + Lua + .NET 9.0 MMORPG Demo. Phase 1 (Login / Role / City) in progre
 dotnet build server/MmoDemo.sln
 dotnet run --project server/src/MmoDemo.Gateway/MmoDemo.Gateway.csproj   # http://localhost:5000
 dotnet test server/MmoDemo.sln                                            # xUnit + WebApplicationFactory<T>
-```
-
-### AI Scripts
-
-Requires `.venv\` and `.env` with API keys.
-
-```powershell
-.\.venv\Scripts\python.exe ai\scripts\check_env.py
-.\.venv\Scripts\python.exe ai\scripts\smoke_test.py
-.\.venv\Scripts\python.exe ai\scripts\ai_chat.py --provider qwen --prompt "..."
 ```
 
 ## Task Rules

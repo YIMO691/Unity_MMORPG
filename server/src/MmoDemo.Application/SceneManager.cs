@@ -54,6 +54,23 @@ public class SceneManager : ISceneManager
 
     public void AddScene(Scene scene) => _scenes[scene.SceneId] = scene;
 
+    public void AddEntity(string sceneId, Entity entity)
+    {
+        entity.SceneId = sceneId;
+        _entities[entity.EntityId] = entity;
+        if (_scenes.TryGetValue(sceneId, out var scene))
+            lock (scene.EntityIds)
+                scene.EntityIds.Add(entity.EntityId);
+    }
+
+    public void RemoveEntityFromScene(string sceneId, string entityId)
+    {
+        if (_scenes.TryGetValue(sceneId, out var scene))
+            lock (scene.EntityIds)
+                scene.EntityIds.Remove(entityId);
+        _entities.TryRemove(entityId, out _);
+    }
+
     public void RegisterConnection(string connectionId, PlayerEntity player)
     {
         _entities[player.EntityId] = player;
