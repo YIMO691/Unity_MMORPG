@@ -9,13 +9,11 @@ public class WebSocketHandler : IWebSocketHandler
 {
     private readonly IMessageRouter _router;
     private readonly ISceneManager _sceneManager;
-    private readonly MonsterService _monsters;
 
-    public WebSocketHandler(IMessageRouter router, ISceneManager sceneManager, MonsterService monsters)
+    public WebSocketHandler(IMessageRouter router, ISceneManager sceneManager)
     {
         _router = router;
         _sceneManager = sceneManager;
-        _monsters = monsters;
     }
 
     public async Task HandleConnectionAsync(WebSocket socket, string connectionId, CancellationToken ct)
@@ -28,11 +26,7 @@ public class WebSocketHandler : IWebSocketHandler
         {
             while (socket.State == WebSocketState.Open && !ct.IsCancellationRequested)
             {
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
-                WebSocketReceiveResult result;
-                try { result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), linked.Token); }
-                catch (OperationCanceledException) { _monsters.TickRespawn(_sceneManager); continue; }
+                var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
 
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
@@ -57,7 +51,6 @@ public class WebSocketHandler : IWebSocketHandler
         catch (OperationCanceledException) { }
         finally
         {
-            // Cleanup: broadcast departure, remove entity
             var player = _sceneManager.GetPlayerByConnection(connectionId);
             if (player != null)
             {
@@ -91,7 +84,7 @@ public class WebSocketHandler : IWebSocketHandler
         catch (Exception ex)
         {
             Console.WriteLine($"[WS] Error: {ex.Message}");
-            return ""; // don't send wrong message type back
+            return "";
         }
     }
 

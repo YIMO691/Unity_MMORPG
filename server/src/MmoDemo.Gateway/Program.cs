@@ -65,6 +65,9 @@ sceneManager.AddScene(new Scene
     BoundsMinZ = -80, BoundsMaxZ = 20
 });
 
+// Start monster respawn timer
+app.Services.GetRequiredService<MonsterService>().StartRespawnTimer(sceneManager);
+
 // ═══════════════ Phase 1 HTTP Endpoints ═══════════════
 
 app.MapGet("/health", () => Results.Ok(new

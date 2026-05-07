@@ -69,6 +69,14 @@ public class MonsterService
 
     public void Reload() => LoadFromLua();
 
+    public void StartRespawnTimer(ISceneManager scenes)
+    {
+        var timer = new System.Timers.Timer(3000);
+        timer.Elapsed += (_, _) => TickRespawn(scenes);
+        timer.AutoReset = true;
+        timer.Start();
+    }
+
     public void MarkDead(Monster monster)
     {
         _deadMonsters[monster.EntityId] = (monster, DateTime.UtcNow.AddSeconds(monster.RespawnSeconds));
