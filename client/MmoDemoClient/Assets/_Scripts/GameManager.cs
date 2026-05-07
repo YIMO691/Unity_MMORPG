@@ -418,7 +418,7 @@ namespace MmoDemo.Client
             if (nearbyDrop != null)
             {
                 _pendingPickups.Add(nearbyDrop);
-                _ws.SendAsync("c2s.pickup_item", $"{{\"dropId\":\"{nearbyDrop}\"}}");
+                _ = _ws.SendAsync("c2s.pickup_item", $"{{\"dropId\":\"{nearbyDrop}\"}}");
             }
 
             // Auto-target: highlight nearest monster
