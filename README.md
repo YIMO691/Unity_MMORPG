@@ -2,69 +2,83 @@
 
 Unity + C# + Lua + .NET 9.0 MMORPG vertical-slice demo for a resume portfolio.
 
-The current implementation includes guest login, role selection, city entry, WebSocket movement, monsters, combat, drops, inventory, quest progress, and scene chat. Data is stored in memory for demo purposes.
+## Features
 
-## Repository Layout
+| Phase | Feature | Status |
+|-------|---------|--------|
+| 1 | Guest login, role create/select, city entry | Done |
+| 2 | WebSocket real-time connection, movement sync, entity snapshots | Done |
+| 3 | Combat (3 skills), monster AI, drops, inventory (use/equip) | Done |
+| 4 | Kill quests (3 quests), scene chat broadcast | Done |
 
-```text
-client/MmoDemoClient/  Unity client project
-server/                .NET 9.0 ASP.NET Core gateway and tests
-proto/                 Protocol design drafts
-docs/                  Roadmap, architecture, design notes, changelog
-configs/               Configuration examples
-assets_source/         Source art or asset references
-tools/                 Local project tooling
-```
+All game state is in-memory (no database dependency). Server-authoritative for combat, loot, inventory, quests. Client sends intent only.
 
-## Requirements
+## Quick Start
 
-- Unity Hub with a Unity editor version compatible with `client/MmoDemoClient`
-- .NET SDK 9.0 or newer SDK capable of targeting `net9.0`
-- PowerShell on Windows
-
-## Server
-
-From the repository root:
+### Server
 
 ```powershell
-dotnet build server/MmoDemo.sln
-dotnet test server/MmoDemo.sln
 dotnet run --project server/src/MmoDemo.Gateway/MmoDemo.Gateway.csproj
+# http://localhost:5000  |  ws://localhost:5000/ws
 ```
 
-The gateway listens on:
+### Client
 
-```text
-http://localhost:5000
-ws://localhost:5000/ws
+Open `client/MmoDemoClient/` in Unity Hub (2022.3 LTS recommended). Open the Bootstrap scene and press Play.
+
+### Tests
+
+```powershell
+dotnet test server/MmoDemo.sln
+# 18 tests: HTTP API + WebSocket + combat + quest + chat
 ```
 
-## Unity Client
+## Architecture
 
-Open this folder in Unity Hub:
-
-```text
-F:\AI_MMORPG\client\MmoDemoClient
+```
+Client                          Server
+──────                          ──────
+Unity C# (UI, rendering)  ←→   ASP.NET Core minimal API
+  GameLauncher                    ├─ /health, /api/auth/*, /api/roles/* (HTTP)
+  UIManager                       └─ /ws (WebSocket)
+  GameManager                       ├─ MessageRouter (dispatch by type)
+  WebSocketClient                   ├─ Services (Auth, Combat, Quest, Chat…)
+  ChatPanel / QuestTracker          ├─ SceneManager (entities, connections)
+                                    └─ In-memory stores (no DB)
 ```
 
-Do not open the repository root as a Unity project. The root-level `Assets/`, `Library/`, `Packages/`, `ProjectSettings/`, and `UserSettings/` folders are ignored as accidental Unity-generated output.
+- Client sends **intent** (`c2s.*`), server is **authoritative**
+- WebSocket envelope: `{"t": "<type>", "ts": <unix_ms>, "p": <payload>}`
+- C# handles high-frequency systems, Lua is reserved for UI flow / hotfix
 
-## Configuration
+## Project Layout
 
-Copy `.env.example` to `.env` for local AI provider settings. Never commit `.env`, API keys, tokens, or `*.local.json` files.
+```
+client/MmoDemoClient/    Unity project
+server/                  .NET 9.0 solution
+  src/
+    MmoDemo.Gateway/     Minimal API entry point
+    MmoDemo.Application/ Business logic (Interfaces/ + Services/ + routing)
+    MmoDemo.Contracts/   HTTP models + WebSocket message types/payloads
+    MmoDemo.Domain/      Entity, PlayerEntity, Monster, Item, Quest, Role, Scene
+    MmoDemo.Infrastructure/  In-memory stores
+  tests/
+proto/                   Protocol design drafts
+docs/                    Architecture, phases, design notes, changelog
+configs/                 CSV config templates
+```
 
 ## Documentation
 
-- [Project roadmap](docs/10_Roadmap.md)
+- [Roadmap](docs/10_Roadmap.md)
 - [Changelog](docs/11_Changelog.md)
-- [Phase docs](docs/phases/)
+- [Architecture](docs/architecture/)
+- [Phase plans](docs/phases/)
 - [Design docs](docs/design/)
-- [Architecture docs](docs/architecture/)
 
-## Current Non-Goals
+## Constraints
 
-- Database persistence
-- Redis
-- Docker deployment
-- CI/CD workflows
-- Production authentication
+- No frameworks without approval. No new tech stack.
+- Never commit secrets. `.env`, `*.local.json` are gitignored.
+- Do not commit build outputs: `bin/`, `obj/`, `Library/`, `Temp/`, `Build/`, `Builds/`, `Logs/`
+- Update `docs/11_Changelog.md` for completed work.
