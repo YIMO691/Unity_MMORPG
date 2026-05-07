@@ -3,7 +3,7 @@
 当前项目远程仓库：
 
 ```text
-https://github.com/YIMO691/Unity_MMORPG
+https://github.com/YIMO691/MMORPGDemo3
 ```
 
 本地 `origin` 已设置为上面的仓库地址。不要在未检查 `.gitignore` 和密钥前执行 `git push`。
@@ -18,14 +18,14 @@ git remote -v
 期望看到：
 
 ```text
-origin  https://github.com/YIMO691/Unity_MMORPG.git (fetch)
-origin  https://github.com/YIMO691/Unity_MMORPG.git (push)
+origin  https://github.com/YIMO691/MMORPGDemo3.git (fetch)
+origin  https://github.com/YIMO691/MMORPGDemo3.git (push)
 ```
 
 ## 如果需要重新设置 remote
 
 ```powershell
-git remote set-url origin https://github.com/YIMO691/Unity_MMORPG.git
+git remote set-url origin https://github.com/YIMO691/MMORPGDemo3.git
 ```
 
 ## 如果要用 GitHub CLI
