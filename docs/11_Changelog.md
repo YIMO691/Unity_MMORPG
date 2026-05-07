@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-05-07 — Scene Lifecycle Fixes
+
+- Fixed monster respawn by broadcasting respawned monsters to clients as `s2c.entity_joined`.
+- Prevented repeated scene entry from spawning duplicate baseline monsters.
+- Fixed duplicate drop spawn delivery to the killing client, which left unpickable yellow ghost drops.
+- Updated Unity client pickup handling to wait for server acknowledgement before removing drops locally.
+- Added system chat notices for scene entry, scene transition, monster respawn, and item pickup.
+- Cleared chat input focus after sending so movement resumes cleanly.
+- Reduced Unity Console output to connection/errors only for routine gameplay messages.
+- Replaced boundary-based scene switching with visible fixed portal markers in each scene.
+- Throttled monster respawn system notices to avoid repeated chat spam.
+- Added immediate local chat echo and server-broadcast confirmation coverage for sent chat messages.
+- Fixed chat local echo confirmation for repeated sends and JSON-escaped Unicode text.
+- Registered Lua CLR bridge types before exposing `network` and `ui`, and removed routine Lua lifecycle logs.
+
 ## 2026-05-07 — Phase 7: World Map / Multiple Scenes
 
 ### Server

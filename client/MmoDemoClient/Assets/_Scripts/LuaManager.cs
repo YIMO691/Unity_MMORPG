@@ -9,27 +9,19 @@ namespace MmoDemo.Client
     {
         private Script _script;
         private readonly Dictionary<string, object> _bridges = new();
+        private readonly HashSet<Type> _registeredBridgeTypes = new();
 
         public void Start()
         {
             _script = new Script();
             foreach (var kv in _bridges)
-            {
-                try { _script.Globals[kv.Key] = DynValue.FromObject(_script, kv.Value); }
-                catch (Exception e) { Debug.LogWarning($"[Lua] Bridge '{kv.Key}' failed: {e.Message}"); }
-            }
-            Debug.Log("[Lua] MoonSharp VM started");
+                ApplyBridge(kv.Key, kv.Value);
         }
 
         public void RegisterBridge(string name, object instance)
         {
             _bridges[name] = instance;
-            if (_script != null)
-            {
-                try { _script.Globals[name] = DynValue.FromObject(_script, instance); }
-                catch (Exception e) { Debug.LogWarning($"[Lua] Bridge '{name}' failed: {e.Message}"); }
-            }
-            Debug.Log($"[Lua] Registered bridge: {name}");
+            if (_script != null) ApplyBridge(name, instance);
         }
 
         public DynValue DoString(string script)
@@ -62,18 +54,31 @@ namespace MmoDemo.Client
         {
             _script = new Script();
             foreach (var kv in _bridges)
-            {
-                try { _script.Globals[kv.Key] = DynValue.FromObject(_script, kv.Value); }
-                catch (Exception e) { Debug.LogWarning($"[Lua] Bridge '{kv.Key}' failed: {e.Message}"); }
-            }
-            Debug.Log("[Lua] VM reloaded (hotfix applied)");
+                ApplyBridge(kv.Key, kv.Value);
         }
 
         public void Dispose()
         {
-            Debug.Log("[Lua] VM disposed");
             _bridges.Clear();
             _script = null;
+        }
+
+        private void ApplyBridge(string name, object instance)
+        {
+            if (_script == null || instance == null) return;
+
+            try
+            {
+                var type = instance.GetType();
+                if (_registeredBridgeTypes.Add(type))
+                    UserData.RegisterType(type);
+
+                _script.Globals[name] = UserData.Create(instance);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Lua] Bridge '{name}' failed: {e.Message}");
+            }
         }
     }
 }

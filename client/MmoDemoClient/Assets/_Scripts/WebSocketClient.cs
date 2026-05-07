@@ -46,7 +46,6 @@ namespace MmoDemo.Client
         {
             if (_socket?.State != WebSocketState.Open) return;
             var envelope = $"{{\"t\":\"{type}\",\"ts\":{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()},\"p\":{payloadJson}}}";
-            Debug.Log($"[WS] Send: {envelope}");
             var bytes = Encoding.UTF8.GetBytes(envelope);
             await _socket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _cts.Token);
         }

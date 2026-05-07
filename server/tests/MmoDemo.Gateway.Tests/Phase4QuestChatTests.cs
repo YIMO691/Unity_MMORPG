@@ -50,8 +50,14 @@ public class Phase4QuestChatTests : IClassFixture<WebApplicationFactory<Program>
         // Client 1 sends chat
         await Send(s1, MessageTypes.Chat, new ChatPayload { Text = "Hello world!" });
 
+        // Sender also receives its own broadcast so the client can confirm the local echo
+        var (selfType, selfRaw) = await ReceiveUntil(s1, MessageTypes.ChatBroadcast);
+        Assert.Equal(MessageTypes.ChatBroadcast, selfType);
+        Assert.Contains("Hello world!", selfRaw);
+        Assert.Contains("Chatter", selfRaw);
+
         // Client 2 receives broadcast
-        var (t, raw) = await Receive(s2);
+        var (t, raw) = await ReceiveUntil(s2, MessageTypes.ChatBroadcast);
         Assert.Equal(MessageTypes.ChatBroadcast, t);
         Assert.Contains("Hello world!", raw);
         Assert.Contains("Chatter", raw);
@@ -188,6 +194,17 @@ public class Phase4QuestChatTests : IClassFixture<WebApplicationFactory<Program>
         var raw = Encoding.UTF8.GetString(buf, 0, r.Count);
         using var d = JsonDocument.Parse(raw);
         return (d.RootElement.GetProperty("t").GetString()!, raw);
+    }
+
+    private static async Task<(string type, string raw)> ReceiveUntil(WebSocket s, string expectedType)
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            var (type, raw) = await ReceiveWithTimeout(s, 1000);
+            if (type == expectedType) return (type, raw);
+        }
+
+        throw new TimeoutException($"Expected websocket message type {expectedType}");
     }
 
     private static string ExtractEntityIdOfType(string json, string entityType)

@@ -2,12 +2,12 @@
 
 ## Project
 
-Unity + C# + Lua + .NET 9.0 MMORPG Demo (resume portfolio vertical slice). Currently at Phase 3: combat, monsters, drops, and inventory over WebSocket.
+Unity + C# + Lua + .NET 9.0 MMORPG Demo (resume portfolio vertical slice). Phase 1-7 complete.
 
 ## Current Status
 
-- **Server**: .NET 9.0 ASP.NET Core with HTTP endpoints + WebSocket, in-memory stores, message routing, combat/movement/drop/inventory services.
-- **Client**: Unity project with login → role select → city flow, WebSocket real-time gameplay (movement, combat, monsters, drops, inventory).
+- **Server**: .NET 9.0 ASP.NET Core with HTTP + WebSocket, in-memory stores, MessageRouter, 10+ services (Auth, Combat, Quest, Chat, Lua hotfix, Resource update).
+- **Client**: Unity project with login → role select → city flow, WebSocket gameplay, chat/quest UI, Lua VM (MoonSharp), resource update, multi-scene with portals.
 - **Proto**: Design drafts in `proto/` — no codegen yet.
 - **No**: Database, Redis, CI/CD, Docker deployment.
 

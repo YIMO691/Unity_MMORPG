@@ -102,6 +102,9 @@ public class EnterSceneResultPayload
     [JsonPropertyName("sceneId")]
     public string SceneId { get; set; } = "";
 
+    [JsonPropertyName("entityId")]
+    public string EntityId { get; set; } = "";
+
     [JsonPropertyName("spawnX")]
     public float SpawnX { get; set; }
 

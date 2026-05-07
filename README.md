@@ -10,6 +10,9 @@ Unity + C# + Lua + .NET 9.0 MMORPG vertical-slice demo for a resume portfolio.
 | 2 | WebSocket real-time connection, movement sync, entity snapshots | Done |
 | 3 | Combat (3 skills), monster AI, drops, inventory (use/equip) | Done |
 | 4 | Kill quests (3 quests), scene chat broadcast | Done |
+| 5 | Lua hotfix (MoonSharp), config-driven quests & monsters | Done |
+| 6 | Remote resource update (manifest, download, cache) | Done |
+| 7 | World map (2 scenes: city + wilderness, portal travel) | Done |
 
 All game state is in-memory (no database dependency). Server-authoritative for combat, loot, inventory, quests. Client sends intent only.
 
@@ -30,7 +33,7 @@ Open `client/MmoDemoClient/` in Unity Hub (2022.3 LTS recommended). Open the Boo
 
 ```powershell
 dotnet test server/MmoDemo.sln
-# 18 tests: HTTP API + WebSocket + combat + quest + chat
+# 30 tests: HTTP API + WebSocket + combat + quest + chat + Lua + resource + scene
 ```
 
 ## Architecture
@@ -40,16 +43,19 @@ Client                          Server
 ──────                          ──────
 Unity C# (UI, rendering)  ←→   ASP.NET Core minimal API
   GameLauncher                    ├─ /health, /api/auth/*, /api/roles/* (HTTP)
-  UIManager                       └─ /ws (WebSocket)
-  GameManager                       ├─ MessageRouter (dispatch by type)
-  WebSocketClient                   ├─ Services (Auth, Combat, Quest, Chat…)
-  ChatPanel / QuestTracker          ├─ SceneManager (entities, connections)
-                                    └─ In-memory stores (no DB)
+  UIManager                       ├─ /api/resources/* (resource update)
+  GameManager                     ├─ /api/admin/reload-config (Lua hotfix)
+  WebSocketClient                 └─ /ws (WebSocket)
+  ChatPanel / QuestTracker          ├─ MessageRouter (dispatch by type)
+  ResourceManager                   ├─ Services (Auth, Combat, Quest, Chat…)
+  LuaManager (MoonSharp)            ├─ SceneManager (entities, connections)
+  CameraFollow                      └─ In-memory stores (no DB)
 ```
 
 - Client sends **intent** (`c2s.*`), server is **authoritative**
 - WebSocket envelope: `{"t": "<type>", "ts": <unix_ms>, "p": <payload>}`
-- C# handles high-frequency systems, Lua is reserved for UI flow / hotfix
+- C# handles high-frequency systems, Lua handles hotfix configs & UI flow
+- Scenes: `city_001` (Main City) + `field_001` (Wilderness), portal travel
 
 ## Project Layout
 
@@ -65,7 +71,8 @@ server/                  .NET 9.0 solution
   tests/
 proto/                   Protocol design drafts
 docs/                    Architecture, phases, design notes, changelog
-configs/                 CSV config templates
+configs/                 Lua config tables (quests.lua, monsters.lua)
+resources/               Remote-updateable resource files
 ```
 
 ## Documentation

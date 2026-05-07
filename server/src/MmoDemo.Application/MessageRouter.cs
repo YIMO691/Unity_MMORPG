@@ -94,19 +94,25 @@ public class MessageRouter : IMessageRouter
         if (entered == null)
             return MakeResponse(MessageTypes.EnterSceneResult, new EnterSceneResultPayload { Ok = false });
 
-        // Phase 7: Spawn different monsters per scene
+        // Phase 7: Seed each scene once; deaths are restored through respawn.
         if (p.SceneId == "field_001")
         {
-            _monsters.SpawnMonster(p.SceneId, "wolf", -25, -35);
-            _monsters.SpawnMonster(p.SceneId, "wolf", -35, -25);
-            _monsters.SpawnMonster(p.SceneId, "goblin", -28, -28);
-            _monsters.SpawnMonster(p.SceneId, "goblin", -32, -32);
+            _monsters.EnsureSceneMonsters(p.SceneId,
+            [
+                ("wolf", -25, -35),
+                ("wolf", -35, -25),
+                ("goblin", -28, -28),
+                ("goblin", -32, -32)
+            ]);
         }
         else
         {
-            _monsters.SpawnMonster(p.SceneId, "slime", 5, 3);
-            _monsters.SpawnMonster(p.SceneId, "goblin", -4, -2);
-            _monsters.SpawnMonster(p.SceneId, "wolf", 3, -4);
+            _monsters.EnsureSceneMonsters(p.SceneId,
+            [
+                ("slime", 5, 3),
+                ("goblin", -4, -2),
+                ("wolf", 3, -4)
+            ]);
         }
 
         var entities = _scenes.GetEntities(p.SceneId).Select(ToSnapshot).ToList();
@@ -116,7 +122,7 @@ public class MessageRouter : IMessageRouter
 
         return MakeResponse(MessageTypes.EnterSceneResult, new EnterSceneResultPayload
         {
-            Ok = true, SceneId = p.SceneId,
+            Ok = true, SceneId = p.SceneId, EntityId = player.EntityId,
             SpawnX = player.PosX, SpawnY = player.PosY, SpawnZ = player.PosZ,
             Entities = entities
         });
@@ -218,7 +224,6 @@ public class MessageRouter : IMessageRouter
                     PosX = target.PosX, PosZ = target.PosZ
                 });
                 _scenes.Broadcast(player.SceneId, "", dropMsg);
-                _scenes.SendToConnection(cid, dropMsg);
             }
         }
 

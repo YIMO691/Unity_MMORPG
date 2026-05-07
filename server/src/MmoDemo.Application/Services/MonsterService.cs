@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using MmoDemo.Contracts;
 using MoonSharp.Interpreter;
 using MmoDemo.Domain;
 
@@ -14,6 +16,7 @@ public class MonsterService
     private Dictionary<string, MonsterTemplate> _templates = new();
     private readonly string _configPath;
     private readonly ConcurrentDictionary<string, (Monster monster, DateTime respawnAt)> _deadMonsters = new();
+    private readonly ConcurrentDictionary<string, byte> _seededScenes = new();
     private System.Timers.Timer? _respawnTimer;
 
     public static Dictionary<string, MonsterTemplate> Templates { get; private set; } = new();
@@ -80,6 +83,7 @@ public class MonsterService
 
     public void MarkDead(Monster monster)
     {
+        monster.AiState = MonsterAiState.Dead;
         _deadMonsters[monster.EntityId] = (monster, DateTime.UtcNow.AddSeconds(monster.RespawnSeconds));
     }
 
@@ -97,8 +101,19 @@ public class MonsterService
                 m.PosZ = m.PatrolCenterZ;
                 scenes.AddEntity(m.SceneId, m);
                 _deadMonsters.TryRemove(kv.Key, out _);
+
+                scenes.Broadcast(m.SceneId, "", MakeResponse(MessageTypes.EntityJoined,
+                    new EntityJoinedPayload { Entity = ToSnapshot(m) }));
             }
         }
+    }
+
+    public void EnsureSceneMonsters(string sceneId, IEnumerable<(string templateId, float x, float z)> spawns)
+    {
+        if (!_seededScenes.TryAdd(sceneId, 0)) return;
+
+        foreach (var (templateId, x, z) in spawns)
+            SpawnMonster(sceneId, templateId, x, z);
     }
 
     public Monster SpawnMonster(string sceneId, string templateId, float x, float z)
@@ -237,4 +252,19 @@ public class MonsterService
 
     private static float Dist(Entity a, Entity b) =>
         MathF.Sqrt((a.PosX - b.PosX) * (a.PosX - b.PosX) + (a.PosZ - b.PosZ) * (a.PosZ - b.PosZ));
+
+    private static EntitySnapshotData ToSnapshot(Entity e) => new()
+    {
+        EntityId = e.EntityId,
+        Type = e.Type.ToString().ToLower(),
+        Name = (e as Monster)?.DisplayName ?? "",
+        PosX = e.PosX,
+        PosY = e.PosY,
+        PosZ = e.PosZ,
+        RotY = e.RotY,
+        Hp = e.Hp
+    };
+
+    private static string MakeResponse(string type, object payload) =>
+        JsonSerializer.Serialize(new { t = type, ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), p = payload });
 }

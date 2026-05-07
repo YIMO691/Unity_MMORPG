@@ -59,7 +59,8 @@ public class Phase7WorldMapTests : IClassFixture<WebApplicationFactory<Program>>
 
         // Enter city
         await Send(s, MessageTypes.EnterScene, new EnterScenePayload { SceneId = "city_001" });
-        await Receive(s); // enter_scene_result
+        var (_, cityRaw) = await Receive(s); // enter_scene_result
+        var cityMonsterCount = CountMonsters(cityRaw);
 
         // Switch to field
         await Send(s, MessageTypes.EnterScene, new EnterScenePayload { SceneId = "field_001" });
@@ -72,6 +73,7 @@ public class Phase7WorldMapTests : IClassFixture<WebApplicationFactory<Program>>
         (t, raw) = await Receive(s);
         Assert.Equal(MessageTypes.EnterSceneResult, t);
         Assert.Contains("city_001", raw);
+        Assert.Equal(cityMonsterCount, CountMonsters(raw));
 
         await s.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
     }
@@ -116,5 +118,18 @@ public class Phase7WorldMapTests : IClassFixture<WebApplicationFactory<Program>>
         var raw = Encoding.UTF8.GetString(buf, 0, r.Count);
         using var d = JsonDocument.Parse(raw);
         return (d.RootElement.GetProperty("t").GetString()!, raw);
+    }
+
+    private static int CountMonsters(string raw)
+    {
+        var count = 0;
+        var index = 0;
+        const string marker = "\"type\":\"monster\"";
+        while ((index = raw.IndexOf(marker, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += marker.Length;
+        }
+        return count;
     }
 }

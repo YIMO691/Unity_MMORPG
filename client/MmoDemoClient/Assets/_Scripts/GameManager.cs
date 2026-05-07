@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace MmoDemo.Client
 {
@@ -20,9 +22,13 @@ namespace MmoDemo.Client
         private string _playerId, _token, _roleId, _myEntityId, _currentSceneId;
         private readonly Dictionary<string, GameObject> _entities = new();
         private readonly Dictionary<string, GameObject> _drops = new();
+        private readonly HashSet<string> _pendingPickups = new();
         private GameObject _localPlayer;
+        private GameObject _portalMarker;
         private int _score;
         private float _portalCooldown;
+        private bool _isSwitchingScene;
+        private float _nextRespawnNoticeAt;
 
         public bool IsReady { get; private set; }
 
@@ -36,6 +42,7 @@ namespace MmoDemo.Client
         public async void Connect(string playerId, string token, string roleId)
         {
             _playerId = playerId; _token = token; _roleId = roleId;
+            _myEntityId = $"entity_{roleId}";
             _ws = new WebSocketClient(wsUrl);
             _ws.OnMessage += OnWsMessage;
             _ws.OnDisconnected += OnDisconnected;
@@ -67,11 +74,9 @@ namespace MmoDemo.Client
 
         private void OnWsMessage(string type, string payload)
         {
-            Debug.Log($"[Game] Received: type={type} payload={payload[..Math.Min(payload.Length, 100)]}");
             switch (type)
             {
                 case "s2c.auth_result":
-                    Debug.Log("[Game] Auth response: " + payload);
                     if (ExtractBool(payload, "\"ok\":")) SendEnterScene("city_001");
                     else Debug.LogError("[Game] Auth failed: " + payload);
                     break;
@@ -80,7 +85,7 @@ namespace MmoDemo.Client
                 case "s2c.entity_snapshot":
                     HandleSnapshot(payload); break;
                 case "s2c.entity_joined":
-                    SpawnEntity(ExtractNested(payload, "\"entity\":"));
+                    HandleEntityJoined(ExtractNested(payload, "\"entity\":"));
                     break;
                 case "s2c.entity_left":
                     DespawnEntity(ExtractString(payload, "\"entityId\":\""));
@@ -108,7 +113,13 @@ namespace MmoDemo.Client
 
         private void HandleEnterScene(string p)
         {
-            if (!ExtractBool(p, "\"ok\":")) return;
+            if (!ExtractBool(p, "\"ok\":"))
+            {
+                _isSwitchingScene = false;
+                IsReady = _localPlayer != null;
+                NotifySystem("Scene change failed.");
+                return;
+            }
 
             // Phase 7: Despawn old entities on scene switch
             foreach (var kv in _entities)
@@ -117,9 +128,15 @@ namespace MmoDemo.Client
             foreach (var kv in _drops)
                 Destroy(kv.Value);
             _drops.Clear();
+            _pendingPickups.Clear();
             if (_localPlayer != null) Destroy(_localPlayer);
+            if (_portalMarker != null) Destroy(_portalMarker);
 
             _currentSceneId = ExtractString(p, "\"sceneId\":\"");
+            _myEntityId = ExtractString(p, "\"entityId\":\"");
+            if (string.IsNullOrEmpty(_myEntityId))
+                _myEntityId = $"entity_{_roleId}";
+
             var sx = ExtractFloat(p, "\"spawnX\":");
             var sz = ExtractFloat(p, "\"spawnZ\":");
             _localPlayer = Instantiate(localPlayerPrefab, new Vector3(sx, 1, sz), Quaternion.identity);
@@ -133,9 +150,6 @@ namespace MmoDemo.Client
                 if (follow == null) follow = cam.gameObject.AddComponent<CameraFollow>();
                 follow.target = _localPlayer.transform;
             }
-
-            _myEntityId = ExtractString(p, "\"entityId\":\"");
-
             // Only hide StatusText, keep NameText/LevelText/GoldText visible
             foreach (var canvas in FindObjectsOfType<Canvas>())
             {
@@ -149,24 +163,43 @@ namespace MmoDemo.Client
             // Spawn entities from the list (players + monsters)
             var arr = ExtractJsonArray(p, "\"entities\":");
             foreach (var ej in arr)
-                SpawnEntity(ej);
+                SpawnEntity(ej, out _, out _);
 
             _portalCooldown = 3f;
+            _isSwitchingScene = false;
             IsReady = true;
-            Debug.Log($"[Game] Entered scene: {_currentSceneId}");
+            CreatePortalMarker();
+            EventSystem.current?.SetSelectedGameObject(null);
+            NotifySystem($"Entered {GetSceneName(_currentSceneId)}.");
         }
 
         // ═══════════ Entity Spawning ═══════════
 
-        private void SpawnEntity(string json)
+        private void HandleEntityJoined(string json)
         {
+            var spawned = SpawnEntity(json, out var type, out var name);
+            if (spawned && type == "monster" && IsReady)
+                NotifyRespawn(name);
+        }
+
+        private bool SpawnEntity(string json, out string entityType, out string entityName)
+        {
+            entityType = "";
+            entityName = "";
             var eid = ExtractString(json, "\"entityId\":\"");
-            if (string.IsNullOrEmpty(eid) || eid == _myEntityId || _entities.ContainsKey(eid)) return;
+            if (string.IsNullOrEmpty(eid) || eid == _myEntityId) return false;
+            if (_entities.TryGetValue(eid, out var existing))
+            {
+                Destroy(existing);
+                _entities.Remove(eid);
+            }
 
             var etype = ExtractString(json, "\"type\":\"");
             var x = ExtractFloat(json, "\"posX\":");
             var z = ExtractFloat(json, "\"posZ\":");
             var name = ExtractString(json, "\"name\":\"");
+            entityType = etype;
+            entityName = string.IsNullOrEmpty(name) ? etype : name;
 
             GameObject go;
             if (etype == "monster")
@@ -182,6 +215,7 @@ namespace MmoDemo.Client
 
             go.name = $"{name}({eid[..6]})";
             _entities[eid] = go;
+            return true;
         }
 
         private void UpdateEntity(string json)
@@ -236,7 +270,6 @@ namespace MmoDemo.Client
             var gold = (int)ExtractFloat(p, "\"goldReward\":");
             DespawnEntity(eid);
             _score += gold;
-            Debug.Log($"[Game] Monster killed! +{exp} exp +{gold} gold. Score: {_score}");
         }
 
         // ═══════════ Phase 3: Drops ═══════════
@@ -244,27 +277,37 @@ namespace MmoDemo.Client
         private void HandleDropSpawned(string p)
         {
             var dropId = ExtractString(p, "\"dropId\":\"");
+            if (string.IsNullOrEmpty(dropId)) return;
             var itemName = ExtractString(p, "\"itemName\":\"");
             var x = ExtractFloat(p, "\"posX\":");
             var z = ExtractFloat(p, "\"posZ\":");
+            if (_drops.TryGetValue(dropId, out var oldDrop))
+                Destroy(oldDrop);
+
             var go = Instantiate(dropPrefab, new Vector3(x, 0.5f, z), Quaternion.identity);
             go.name = itemName;
             go.GetComponent<Renderer>().material.color = Color.yellow;
             _drops[dropId] = go;
+            _pendingPickups.Remove(dropId);
         }
 
         private void HandleDropPickedUp(string p)
         {
             var dropId = ExtractString(p, "\"dropId\":\"");
-            if (_drops.TryGetValue(dropId, out var go)) { Destroy(go); _drops.Remove(dropId); }
+            var pickedBy = ExtractString(p, "\"pickedBy\":\"");
+            _pendingPickups.Remove(dropId);
+            if (_drops.TryGetValue(dropId, out var go))
+            {
+                if (pickedBy == _myEntityId)
+                    NotifySystem($"Picked up {go.name}.");
+                Destroy(go);
+                _drops.Remove(dropId);
+            }
         }
 
         private void HandleInventory(string p)
         {
-            var count = 0;
-            foreach (var item in ExtractJsonArray(p, "\"items\":"))
-                count++;
-            Debug.Log($"[Game] Inventory: {count} items");
+            // Inventory UI is not implemented yet; keep server sync silent during normal play.
         }
 
         // ═══════════ Phase 4: Chat ═══════════
@@ -287,7 +330,6 @@ namespace MmoDemo.Client
             var target = (int)ExtractFloat(p, "\"targetCount\":");
             var desc = ExtractString(p, "\"description\":\"");
             OnQuestUpdated?.Invoke($"{desc}: {progress}/{target}");
-            Debug.Log($"[Game] Quest updated: {name} {progress}/{target}");
         }
 
         private void HandleQuestCompleted(string p)
@@ -297,7 +339,6 @@ namespace MmoDemo.Client
             var gold = (int)ExtractFloat(p, "\"goldReward\":");
             OnQuestCompleted?.Invoke($"Quest Complete: {name}! +{exp} exp, +{gold} gold");
             _score += gold;
-            Debug.Log($"[Game] Quest completed: {name} +{exp}exp +{gold}gold");
         }
 
         // ═══════════ Snapshot ═══════════
@@ -339,24 +380,11 @@ namespace MmoDemo.Client
             if (_portalCooldown <= 0)
             {
                 var pos = _localPlayer.transform.position;
-                if (_currentSceneId == "city_001" && (pos.x > 40 || pos.x < -40 || pos.z > 40 || pos.z < -40))
-                {
-                    Debug.Log("[Game] Portal → Wilderness");
-                    IsReady = false;
-                    _currentSceneId = "field_001";
-                    _nearestMonsterId = null;
-                    _portalCooldown = 3f;
-                    SendEnterScene("field_001");
-                }
-                else if (_currentSceneId == "field_001" && (pos.x > 15 || pos.x < -75 || pos.z > 15 || pos.z < -75))
-                {
-                    Debug.Log("[Game] Portal → Main City");
-                    IsReady = false;
-                    _currentSceneId = "city_001";
-                    _nearestMonsterId = null;
-                    _portalCooldown = 3f;
-                    SendEnterScene("city_001");
-                }
+                var portal = GetPortalPosition(_currentSceneId);
+                var dx = pos.x - portal.x;
+                var dz = pos.z - portal.y;
+                if (dx * dx + dz * dz <= 6.25f)
+                    RequestSceneChange(GetPortalTargetScene(_currentSceneId));
             }
 
             // Phase 3: Auto-pickup nearby drops (within 2 units)
@@ -365,14 +393,17 @@ namespace MmoDemo.Client
             foreach (var kv in _drops)
             {
                 if (kv.Value == null) continue;
-                if (Vector3.Distance(playerPos, kv.Value.transform.position) < 2f)
+                if (_pendingPickups.Contains(kv.Key)) continue;
+                var dropPos = kv.Value.transform.position;
+                var dx = playerPos.x - dropPos.x;
+                var dz = playerPos.z - dropPos.z;
+                if (dx * dx + dz * dz <= 9f)
                 { nearbyDrop = kv.Key; break; }
             }
             if (nearbyDrop != null)
             {
+                _pendingPickups.Add(nearbyDrop);
                 _ws.SendAsync("c2s.pickup_item", $"{{\"dropId\":\"{nearbyDrop}\"}}");
-                Destroy(_drops[nearbyDrop]);
-                _drops.Remove(nearbyDrop);
             }
 
             // Auto-target: highlight nearest monster
@@ -396,8 +427,84 @@ namespace MmoDemo.Client
         {
             if (string.IsNullOrEmpty(_nearestMonsterId)) return;
             SendCastSkill(_nearestMonsterId, skillId);
-            Debug.Log($"[Game] Cast skill {skillId} → {_nearestMonsterId}");
         }
+
+        private void RequestSceneChange(string sceneId)
+        {
+            if (_isSwitchingScene || string.IsNullOrEmpty(sceneId)) return;
+
+            _isSwitchingScene = true;
+            IsReady = false;
+            _nearestMonsterId = null;
+            _portalCooldown = 3f;
+            EventSystem.current?.SetSelectedGameObject(null);
+            NotifySystem($"Entering {GetSceneName(sceneId)}...");
+            SendEnterScene(sceneId);
+        }
+
+        private void NotifySystem(string message)
+        {
+            OnChatReceived?.Invoke("System", message);
+        }
+
+        private void NotifyRespawn(string monsterName)
+        {
+            if (Time.time < _nextRespawnNoticeAt) return;
+            _nextRespawnNoticeAt = Time.time + 3f;
+            NotifySystem("Monsters respawned nearby.");
+        }
+
+        private void CreatePortalMarker()
+        {
+            var targetScene = GetPortalTargetScene(_currentSceneId);
+            if (string.IsNullOrEmpty(targetScene)) return;
+
+            var portal = GetPortalPosition(_currentSceneId);
+            _portalMarker = new GameObject($"Portal_To_{targetScene}");
+            _portalMarker.transform.position = new Vector3(portal.x, 0f, portal.y);
+
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = "PortalRing";
+            ring.transform.SetParent(_portalMarker.transform);
+            ring.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+            ring.transform.localScale = new Vector3(3.5f, 0.08f, 3.5f);
+
+            var renderer = ring.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.material.color = _currentSceneId == "city_001"
+                    ? new Color(0.1f, 0.75f, 1f)
+                    : new Color(1f, 0.75f, 0.1f);
+            }
+
+            var label = new GameObject("PortalLabel");
+            label.transform.SetParent(_portalMarker.transform);
+            label.transform.localPosition = new Vector3(0f, 2.2f, 0f);
+            label.transform.localRotation = Quaternion.Euler(60f, 0f, 0f);
+            label.transform.localScale = new Vector3(0.22f, 0.22f, 0.22f);
+
+            var text = label.AddComponent<TextMesh>();
+            text.text = $"To {GetSceneName(targetScene)}";
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.color = Color.white;
+            text.fontSize = 36;
+        }
+
+        private static string GetSceneName(string sceneId) =>
+            sceneId == "field_001" ? "Wilderness" :
+            sceneId == "city_001" ? "Main City" :
+            sceneId;
+
+        private static Vector2 GetPortalPosition(string sceneId) =>
+            sceneId == "city_001" ? new Vector2(16f, 0f) :
+            sceneId == "field_001" ? new Vector2(-44f, -30f) :
+            Vector2.zero;
+
+        private static string GetPortalTargetScene(string sceneId) =>
+            sceneId == "city_001" ? "field_001" :
+            sceneId == "field_001" ? "city_001" :
+            "";
 
         private void OnDisconnected(string reason)
         {
@@ -405,7 +512,11 @@ namespace MmoDemo.Client
             IsReady = false;
         }
 
-        private void OnDestroy() => _ws?.Dispose();
+        private void OnDestroy()
+        {
+            if (_portalMarker != null) Destroy(_portalMarker);
+            _ws?.Dispose();
+        }
 
         // ═══════════ JSON Helpers ═══════════
 
@@ -424,8 +535,50 @@ namespace MmoDemo.Client
         {
             var i = json.IndexOf(key); if (i < 0) return ""; i += key.Length;
             if (i < json.Length && json[i] == '"') i++;
-            var end = json.IndexOf('"', i);
-            return end < 0 ? json[i..] : json[i..end];
+            var sb = new StringBuilder();
+            while (i < json.Length)
+            {
+                var c = json[i++];
+                if (c == '"') break;
+                if (c != '\\')
+                {
+                    sb.Append(c);
+                    continue;
+                }
+
+                if (i >= json.Length) break;
+                var escaped = json[i++];
+                switch (escaped)
+                {
+                    case '"': sb.Append('"'); break;
+                    case '\\': sb.Append('\\'); break;
+                    case '/': sb.Append('/'); break;
+                    case 'b': sb.Append('\b'); break;
+                    case 'f': sb.Append('\f'); break;
+                    case 'n': sb.Append('\n'); break;
+                    case 'r': sb.Append('\r'); break;
+                    case 't': sb.Append('\t'); break;
+                    case 'u':
+                        if (i + 4 <= json.Length)
+                        {
+                            try
+                            {
+                                sb.Append((char)Convert.ToInt32(json.Substring(i, 4), 16));
+                                i += 4;
+                            }
+                            catch
+                            {
+                                sb.Append("\\u");
+                            }
+                        }
+                        break;
+                    default:
+                        sb.Append(escaped);
+                        break;
+                }
+            }
+
+            return sb.ToString();
         }
 
         private static string ExtractNested(string json, string key)
