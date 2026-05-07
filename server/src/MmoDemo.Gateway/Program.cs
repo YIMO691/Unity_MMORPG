@@ -1,4 +1,5 @@
 using System.Net.WebSockets;
+using Microsoft.EntityFrameworkCore;
 using MmoDemo.Application;
 using MmoDemo.Contracts;
 using MmoDemo.Domain;
@@ -6,9 +7,26 @@ using MmoDemo.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── In-memory repositories (Phase 1) ──
-builder.Services.AddSingleton<IPlayerRepository, InMemoryPlayerStore>();
-builder.Services.AddSingleton<IRoleRepository, InMemoryRoleStore>();
+// ── Phase 8: PostgreSQL / In-memory repositories ──
+var usePostgres = builder.Configuration.GetValue<bool>("USE_POSTGRES") ||
+                  Environment.GetEnvironmentVariable("USE_POSTGRES") == "true";
+var pgConn = builder.Configuration.GetConnectionString("Postgres") ??
+             Environment.GetEnvironmentVariable("ConnectionStrings__Postgres") ??
+             "Host=localhost;Database=mmorpg;Username=mmorpg;Password=mmorpg123";
+
+if (usePostgres)
+{
+    builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(pgConn));
+    builder.Services.AddSingleton<IPlayerRepository, PostgresPlayerStore>();
+    builder.Services.AddSingleton<IRoleRepository, PostgresRoleStore>();
+    Console.WriteLine("[Init] Using PostgreSQL persistence");
+}
+else
+{
+    builder.Services.AddSingleton<IPlayerRepository, InMemoryPlayerStore>();
+    builder.Services.AddSingleton<IRoleRepository, InMemoryRoleStore>();
+    Console.WriteLine("[Init] Using in-memory stores");
+}
 
 // ── Application services (Phase 1) ──
 builder.Services.AddSingleton<IAuthService, AuthService>();

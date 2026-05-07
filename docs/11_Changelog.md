@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-05-07 — Phase 8: Docker + PostgreSQL + Redis
+
+### Docker
+- `deploy/Dockerfile` — multi-stage .NET 9 build
+- `deploy/docker-compose.yml` — postgres + redis + gateway
+- `deploy/init.sql` — schema auto-initialization
+
+### PostgreSQL (EF Core + Npgsql 9.0)
+- `AppDbContext` — players, sessions, roles, inventory tables
+- `PostgresPlayerStore` — persistent player + session storage
+- `PostgresRoleStore` — persistent role storage
+- Set `USE_POSTGRES=true` to enable; defaults to in-memory
+
+### Redis
+- `StackExchange.Redis` package installed (ready for session caching)
+
+### Development Mode
+- Without Docker: in-memory stores (existing behavior)
+- `dotnet test` — 32/32 pass (no Docker needed)
+
 ## 2026-05-07 — Scene Lifecycle Fixes
 
 - Fixed monster respawn by broadcasting respawned monsters to clients as `s2c.entity_joined`.
