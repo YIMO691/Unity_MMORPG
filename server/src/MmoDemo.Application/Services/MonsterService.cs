@@ -14,6 +14,7 @@ public class MonsterService
     private Dictionary<string, MonsterTemplate> _templates = new();
     private readonly string _configPath;
     private readonly ConcurrentDictionary<string, (Monster monster, DateTime respawnAt)> _deadMonsters = new();
+    private System.Timers.Timer? _respawnTimer;
 
     public static Dictionary<string, MonsterTemplate> Templates { get; private set; } = new();
 
@@ -71,10 +72,10 @@ public class MonsterService
 
     public void StartRespawnTimer(ISceneManager scenes)
     {
-        var timer = new System.Timers.Timer(3000);
-        timer.Elapsed += (_, _) => TickRespawn(scenes);
-        timer.AutoReset = true;
-        timer.Start();
+        _respawnTimer = new System.Timers.Timer(3000);
+        _respawnTimer.Elapsed += (_, _) => TickRespawn(scenes);
+        _respawnTimer.AutoReset = true;
+        _respawnTimer.Start();
     }
 
     public void MarkDead(Monster monster)

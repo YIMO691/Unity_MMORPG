@@ -343,12 +343,18 @@ namespace MmoDemo.Client
                 {
                     Debug.Log("[Game] Portal → Wilderness");
                     IsReady = false;
+                    _currentSceneId = "field_001";
+                    _nearestMonsterId = null;
+                    _portalCooldown = 3f;
                     SendEnterScene("field_001");
                 }
                 else if (_currentSceneId == "field_001" && (pos.x > 15 || pos.x < -75 || pos.z > 15 || pos.z < -75))
                 {
                     Debug.Log("[Game] Portal → Main City");
                     IsReady = false;
+                    _currentSceneId = "city_001";
+                    _nearestMonsterId = null;
+                    _portalCooldown = 3f;
                     SendEnterScene("city_001");
                 }
             }

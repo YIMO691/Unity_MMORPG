@@ -1,9 +1,16 @@
+using System.Collections.Concurrent;
 using MmoDemo.Domain;
 
 namespace MmoDemo.Application;
 
 public class DropService
 {
+    private readonly ConcurrentDictionary<string, int> _activeDrops = new();
+
+    public void TrackDrop(string dropId, int templateId) => _activeDrops[dropId] = templateId;
+    public int? GetDropTemplateId(string dropId) => _activeDrops.TryGetValue(dropId, out var tid) ? tid : null;
+    public void RemoveDrop(string dropId) => _activeDrops.TryRemove(dropId, out _);
+
     // Drop tables: template id -> [droppable item template ids with rates]
     public static readonly Dictionary<int, List<(int itemTemplateId, float chance)>> DropTables = new()
     {

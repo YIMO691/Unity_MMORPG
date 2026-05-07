@@ -211,6 +211,7 @@ public class MessageRouter : IMessageRouter
                 var tpl = _drops.GetTemplate(itemTid);
                 if (tpl == null) continue;
                 var dropId = $"drop_{Guid.NewGuid():N}";
+                _drops.TrackDrop(dropId, itemTid);
                 var dropMsg = MakeResponse(MessageTypes.DropSpawned, new DropSpawnedPayload
                 {
                     DropId = dropId, ItemTemplateId = itemTid, ItemName = tpl.Name,
@@ -232,16 +233,17 @@ public class MessageRouter : IMessageRouter
         var player = _scenes.GetPlayerByConnection(cid);
         if (player == null || p == null) return "{}";
 
-        // Add item to inventory (templateId passed in dropId as "drop_N")
-        var tidStr = p.DropId.Replace("drop_", "");
-        if (int.TryParse(tidStr, out var templateId))
+        // Look up templateId from tracked drops
+        var templateId = _drops.GetDropTemplateId(p.DropId);
+        if (templateId != null)
         {
-            var tpl = _drops.GetTemplate(templateId);
+            var tpl = _drops.GetTemplate(templateId.Value);
             if (tpl != null)
             {
-                _inventory.AddDrop(player.PlayerId, [templateId]);
-                player.Gold += Math.Max(1, templateId);
+                _inventory.AddDrop(player.PlayerId, [templateId.Value]);
+                player.Gold += Math.Max(1, templateId.Value);
             }
+            _drops.RemoveDrop(p.DropId);
         }
 
         var dropMsg = MakeResponse(MessageTypes.DropPickedUp, new DropPickedUpPayload
