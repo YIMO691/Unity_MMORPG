@@ -5,7 +5,12 @@ namespace MmoDemo.Client
 {
     public class GameLauncher : MonoBehaviour
     {
-        [SerializeField] private string serverBaseUrl = "http://localhost:5000";
+        [SerializeField] private string serverBaseUrl = "";
+
+        private string ServerUrl =>
+            !string.IsNullOrEmpty(serverBaseUrl) ? serverBaseUrl :
+            PlayerPrefs.GetString("server_url", Application.isMobilePlatform
+                ? "http://192.168.1.100:5000" : "http://localhost:5000");
         [SerializeField] private GameObject loginViewPrefab;
         [SerializeField] private GameObject roleSelectViewPrefab;
         [SerializeField] private GameObject cityViewPrefab;
@@ -21,10 +26,11 @@ namespace MmoDemo.Client
         {
             DontDestroyOnLoad(gameObject);
 
-            _network = new NetworkManager(serverBaseUrl);
+            var url = ServerUrl;
+            _network = new NetworkManager(url);
             _lua = new LuaManager();
             _ui = new UIManager(loginViewPrefab, roleSelectViewPrefab, cityViewPrefab, _network, this);
-            _resources = new ResourceManager(serverBaseUrl);
+            _resources = new ResourceManager(url);
 
             _lua.RegisterBridge("network", _network);
             _lua.RegisterBridge("ui", _ui);
@@ -39,7 +45,7 @@ namespace MmoDemo.Client
             yield return _network.CheckHealth(ok => healthOk = ok);
             if (!healthOk)
             {
-                Debug.LogError("[Launcher] Cannot reach server at " + serverBaseUrl);
+                Debug.LogError("[Launcher] Cannot reach server at " + ServerUrl);
                 yield break;
             }
 

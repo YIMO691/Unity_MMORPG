@@ -357,8 +357,26 @@ namespace MmoDemo.Client
             if (!IsReady || _localPlayer == null) return;
 
             // Movement
-            var h = Input.GetAxis("Horizontal");
-            var v = Input.GetAxis("Vertical");
+            // Phase 9: Mobile or PC input
+            float h, v;
+            bool s1, s2, s3;
+            if (MobileInput.Instance != null && MobileInput.Instance.IsActive)
+            {
+                h = MobileInput.Instance.Horizontal;
+                v = MobileInput.Instance.Vertical;
+                s1 = MobileInput.Instance.Skill1;
+                s2 = MobileInput.Instance.Skill2;
+                s3 = MobileInput.Instance.Skill3;
+            }
+            else
+            {
+                h = Input.GetAxis("Horizontal");
+                v = Input.GetAxis("Vertical");
+                s1 = Input.GetKeyDown(KeyCode.Alpha1);
+                s2 = Input.GetKeyDown(KeyCode.Alpha2);
+                s3 = Input.GetKeyDown(KeyCode.Alpha3);
+            }
+
             if (Mathf.Abs(h) > 0.01f || Mathf.Abs(v) > 0.01f)
             {
                 var spd = 5f * Time.deltaTime;
@@ -368,12 +386,9 @@ namespace MmoDemo.Client
                 SendMove(h, v, pos.x, pos.z);
             }
 
-            // Skill hotkeys 1/2/3 → attack nearest monster
-            for (int skill = 1; skill <= 3; skill++)
-            {
-                if (Input.GetKeyDown(KeyCode.Alpha0 + skill))
-                    AttackNearest(skill);
-            }
+            if (s1) AttackNearest(1);
+            if (s2) AttackNearest(2);
+            if (s3) AttackNearest(3);
 
             // Phase 7: Portal / scene transition
             if (_portalCooldown > 0) _portalCooldown -= Time.deltaTime;
